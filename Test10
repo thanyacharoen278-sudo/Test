@@ -1,0 +1,623 @@
+--[[
+    DekuzXP | D
+    CompKiller UI · LeftAlt
+    Hold weapon + real M1 · Bring same name · Stable
+]]
+
+repeat task.wait() until game:IsLoaded()
+
+local LOGO = "rbxassetid://120245531583106"
+local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
+local VU = game:GetService("VirtualUser")
+local RS = game:GetService("ReplicatedStorage")
+local LP = Players.LocalPlayer
+repeat task.wait() until LP
+
+local VIM
+pcall(function()
+    VIM = game:GetService("VirtualInputManager")
+end)
+
+-------------------------------------------------
+-- CompKiller
+-------------------------------------------------
+local okLib, Compkiller = pcall(function()
+    return loadstring(game:HttpGet(
+        "https://raw.githubusercontent.com/4lpaca-pin/CompKiller/refs/heads/main/src/source.luau"
+    ))()
+end)
+if not okLib or not Compkiller then
+    warn("[D] CompKiller load failed")
+    return
+end
+
+local Notifier = Compkiller.newNotify()
+local ConfigManager = Compkiller:ConfigManager({
+    Directory = "DekuzXP",
+    Config = "Main",
+})
+
+pcall(function()
+    Compkiller:Loader(LOGO, 1.0).yield()
+end)
+
+local Window = Compkiller.new({
+    Name = "D",
+    Keybind = "LeftAlt",
+    Logo = LOGO,
+    Scale = Compkiller.Scale.Window,
+    TextSize = 14,
+})
+
+pcall(function()
+    Compkiller:SetTheme("Dark Blue")
+    local C = Compkiller.Colors
+    C.Highlight = Color3.fromRGB(70, 160, 255)
+    C.Toggle = Color3.fromRGB(50, 140, 255)
+    C.DropColor = Color3.fromRGB(40, 110, 220)
+    C.BGDBColor = Color3.fromRGB(12, 18, 36)
+    C.BlockBackground = Color3.fromRGB(18, 26, 48)
+    C.StrokeColor = Color3.fromRGB(55, 90, 160)
+    C.SwitchColor = Color3.fromRGB(255, 255, 255)
+    Compkiller:RefreshCurrentColor()
+end)
+
+-------------------------------------------------
+-- STATE
+-------------------------------------------------
+local State = {
+    AutoFarm = false,
+    AutoRaid = false,
+    FastAttack = false,
+    BringMobs = true,
+    Speed = false,
+    WalkSpeed = 120,
+}
+
+local HEAD_HEIGHT = 5.5
+local HITBOX = 60
+local FARM_RANGE = 2500
+local RAID_RANGE = 12000
+local BRING_RANGE = 350
+local AC = nil
+local visited = {}
+local waterPart = nil
+
+local function Char()
+    return LP.Character
+end
+local function Hum()
+    local c = Char()
+    return c and c:FindFirstChildOfClass("Humanoid")
+end
+local function HRP()
+    local c = Char()
+    return c and c:FindFirstChild("HumanoidRootPart")
+end
+local function combatOn()
+    return State.AutoFarm or State.AutoRaid or State.FastAttack
+end
+
+local function EquipWeapon()
+    pcall(function()
+        local char = Char()
+        local hum = Hum()
+        if not char or not hum then return end
+        if char:FindFirstChildOfClass("Tool") then return end
+        local bag = LP:FindFirstChild("Backpack")
+        if not bag then return end
+        for _, t in ipairs(bag:GetChildren()) do
+            if t:IsA("Tool") then
+                local n = string.lower(t.Name)
+                if not string.find(n, "fruit", 1, true) and not string.find(n, "gum", 1, true) then
+                    hum:EquipTool(t)
+                    return
+                end
+            end
+        end
+        for _, t in ipairs(bag:GetChildren()) do
+            if t:IsA("Tool") then
+                hum:EquipTool(t)
+                return
+            end
+        end
+    end)
+end
+
+local function EnsureHoldWeapon()
+    pcall(function()
+        local char = Char()
+        local hum = Hum()
+        if not char or not hum then return end
+        if char:FindFirstChildOfClass("Tool") then return end
+        EquipWeapon()
+    end)
+end
+
+local function LoadCombat()
+    pcall(function()
+        local ps = LP:FindFirstChild("PlayerScripts")
+        if not ps then return end
+        local cf = ps:FindFirstChild("CombatFramework")
+        if cf then
+            AC = require(cf)
+        end
+    end)
+    pcall(function()
+        if AC and AC.activeController then return end
+        if type(getreg) == "function" then
+            for _, v in pairs(getreg()) do
+                if type(v) == "table" and rawget(v, "activeController") then
+                    AC = v
+                    break
+                end
+            end
+        end
+    end)
+end
+
+LoadCombat()
+task.spawn(function()
+    for _ = 1, 20 do
+        if AC and AC.activeController then break end
+        LoadCombat()
+        task.wait(0.5)
+    end
+end)
+LP.CharacterAdded:Connect(function()
+    task.wait(1)
+    AC = nil
+    LoadCombat()
+end)
+
+local function KillShake()
+    pcall(function()
+        local util = RS:FindFirstChild("Util")
+        if util and util:FindFirstChild("CameraShaker") then
+            local m = require(util.CameraShaker)
+            if m and m.Stop then m:Stop() end
+        end
+    end)
+    pcall(function()
+        local ps = LP:FindFirstChild("PlayerScripts")
+        if not ps then return end
+        local cf = ps:FindFirstChild("CombatFramework")
+        if not cf then return end
+        local cam = cf:FindFirstChild("CameraShaker")
+        if cam then
+            local m = require(cam)
+            if m and m.CameraShakeInstance then
+                m.CameraShakeInstance.CameraShakeState = {
+                    FadingIn = 3, FadingOut = 2, Sustained = 0, Inactive = 1
+                }
+            end
+        end
+    end)
+end
+
+-------------------------------------------------
+-- M1
+-------------------------------------------------
+local m1Busy = false
+local function M1Click()
+    if m1Busy then return end
+    m1Busy = true
+    task.spawn(function()
+        pcall(function()
+            EnsureHoldWeapon()
+
+            local tool = Char() and Char():FindFirstChildOfClass("Tool")
+            if tool then
+                tool:Activate()
+            end
+
+            VU:CaptureController()
+            VU:Button1Down(Vector2.new(0, 0))
+            task.wait(0.05)
+            VU:Button1Up(Vector2.new(0, 0))
+
+            if VIM then
+                VIM:SendMouseButtonEvent(0, 0, 0, true, game, 1)
+                task.wait(0.04)
+                VIM:SendMouseButtonEvent(0, 0, 0, false, game, 1)
+            end
+        end)
+        m1Busy = false
+    end)
+end
+
+local function DoAttack()
+    KillShake()
+    EnsureHoldWeapon()
+
+    pcall(function()
+        if not AC then LoadCombat() end
+        local c = AC and AC.activeController
+        if c then
+            c.timeToNextAttack = 0
+            c.attacking = false
+            c.blocking = false
+            c.hitboxMagnitude = HITBOX
+            if type(c.increment) == "number" then
+                c.increment = 1
+            end
+            if type(c.attack) == "function" then
+                pcall(function() c:attack() end)
+            end
+        end
+    end)
+
+    M1Click()
+end
+
+-------------------------------------------------
+-- ENEMY / BRING / FLOAT
+-------------------------------------------------
+local function isPlayerChar(model)
+    for _, plr in ipairs(Players:GetPlayers()) do
+        if plr.Character == model then return true end
+    end
+    return false
+end
+
+local function iterEnemies(fn)
+    local en = workspace:FindFirstChild("Enemies")
+    if en then
+        for _, m in ipairs(en:GetChildren()) do
+            if m:IsA("Model") then fn(m) end
+        end
+    end
+    for _, m in ipairs(workspace:GetChildren()) do
+        if m:IsA("Model") then fn(m) end
+    end
+end
+
+local function GetEnemy(range)
+    local h = HRP()
+    if not h then return nil end
+    local best, bd = nil, range or FARM_RANGE
+    iterEnemies(function(m)
+        if isPlayerChar(m) then return end
+        local mh = m:FindFirstChild("HumanoidRootPart")
+        local hu = m:FindFirstChildOfClass("Humanoid")
+        if mh and hu and hu.Health > 0 then
+            local d = (h.Position - mh.Position).Magnitude
+            if d < bd then best, bd = m, d end
+        end
+    end)
+    return best
+end
+
+local function BringSameName(target)
+    if not State.BringMobs or not target then return end
+    local h = HRP()
+    if not h then return end
+    local name = target.Name
+    local base = h.CFrame
+    iterEnemies(function(m)
+        if m == target then return end
+        -- ใช้ == แทน \~= กันพังตอน copy
+        if m.Name == name then
+        else
+            return
+        end
+        if isPlayerChar(m) then return end
+        local mh = m:FindFirstChild("HumanoidRootPart")
+        local hu = m:FindFirstChildOfClass("Humanoid")
+        if not mh or not hu or hu.Health <= 0 then return end
+        if (h.Position - mh.Position).Magnitude > BRING_RANGE then return end
+        pcall(function()
+            mh.CFrame = base * CFrame.new(
+                math.random(-4, 4),
+                -HEAD_HEIGHT + 1,
+                math.random(-4, 4)
+            )
+            mh.AssemblyLinearVelocity = Vector3.zero
+        end)
+    end)
+end
+
+local function FloatOnHead(enemy, dt)
+    local h = HRP()
+    if not h or not enemy then return end
+    local eh = enemy:FindFirstChild("HumanoidRootPart")
+    if not eh then return end
+
+    local goal = eh.Position + Vector3.new(0, HEAD_HEIGHT, 0)
+    local cur = h.Position
+    local dist = (goal - cur).Magnitude
+    local a = math.clamp((dt or 0.016) * 18, 0.1, 0.4)
+    local np = dist > 40 and goal or cur:Lerp(goal, a)
+    h.CFrame = CFrame.lookAt(np, eh.Position + Vector3.new(0, 1.5, 0))
+
+    pcall(function()
+        h.AssemblyLinearVelocity = Vector3.zero
+        h.AssemblyAngularVelocity = Vector3.zero
+    end)
+    local hum = Hum()
+    if hum then
+        hum.WalkSpeed = 0
+        hum.JumpPower = 0
+        hum.AutoRotate = false
+    end
+end
+
+local function GetIslands()
+    local list = {}
+    local function add(obj)
+        if not obj then return end
+        local part = obj:IsA("BasePart") and obj
+            or (obj:IsA("Model") and (obj.PrimaryPart or obj:FindFirstChildWhichIsA("BasePart", true)))
+        if not part then return end
+        local n = string.lower(obj.Name)
+        if string.find(n, "island", 1, true)
+            or string.find(n, "stage", 1, true)
+            or string.find(n, "platform", 1, true) then
+            table.insert(list, part)
+        end
+    end
+    for _, o in ipairs(workspace:GetChildren()) do
+        add(o)
+        if o:IsA("Folder") or o:IsA("Model") then
+            for _, ch in ipairs(o:GetChildren()) do add(ch) end
+        end
+    end
+    return list
+end
+
+local function FloatToNext(dt)
+    local h = HRP()
+    if not h then return end
+    local islands = GetIslands()
+    if #islands == 0 then return end
+    local best, score = nil, -1
+    for _, p in ipairs(islands) do
+        local d = (h.Position - p.Position).Magnitude
+        local key = math.floor(p.Position.X / 60) .. "_" .. math.floor(p.Position.Z / 60)
+        if d > 40 and d < 15000 and not visited[key] then
+            local s = d < 5000 and d or 5000
+            if s > score then score, best = s, p end
+        end
+    end
+    if not best then
+        visited = {}
+        local far, fd = nil, 0
+        for _, p in ipairs(islands) do
+            local d = (h.Position - p.Position).Magnitude
+            if d > fd and d > 50 then far, fd = p, d end
+        end
+        best = far
+    end
+    if not best then return end
+    local key = math.floor(best.Position.X / 60) .. "_" .. math.floor(best.Position.Z / 60)
+    local goal = best.Position + Vector3.new(0, 8, 0)
+    local cur = h.Position
+    local dist = (goal - cur).Magnitude
+    if dist < 14 then
+        visited[key] = true
+        h.CFrame = CFrame.new(goal)
+        return
+    end
+    local step = math.min(dist, 90 * (dt or 0.016))
+    if dist > 0.05 then
+        h.CFrame = CFrame.new(cur + (goal - cur).Unit * step)
+    end
+    pcall(function() h.AssemblyLinearVelocity = Vector3.zero end)
+end
+
+local function ClearWater()
+    if waterPart then
+        pcall(function() waterPart:Destroy() end)
+        waterPart = nil
+    end
+end
+
+-------------------------------------------------
+-- LOOPS
+-------------------------------------------------
+task.spawn(function()
+    while true do
+        if combatOn() then
+            EnsureHoldWeapon()
+            DoAttack()
+            task.wait(0.08)
+        else
+            task.wait(0.2)
+        end
+    end
+end)
+
+RunService.RenderStepped:Connect(function()
+    if not combatOn() then return end
+    pcall(function()
+        if not AC then LoadCombat() end
+        local c = AC and AC.activeController
+        if c then
+            c.timeToNextAttack = 0
+            c.hitboxMagnitude = HITBOX
+            c.attacking = false
+            c.blocking = false
+        end
+    end)
+    KillShake()
+end)
+
+RunService.Heartbeat:Connect(function(dt)
+    if State.Speed and not State.AutoFarm and not State.AutoRaid then
+        pcall(function()
+            local hum, h = Hum(), HRP()
+            if not hum or not h then return end
+            hum.WalkSpeed = State.WalkSpeed
+            if not waterPart or not waterPart.Parent then
+                local p = Instance.new("Part")
+                p.Name = "D_Water"
+                p.Size = Vector3.new(10, 1, 10)
+                p.Transparency = 1
+                p.Anchored = true
+                p.CanCollide = true
+                p.Parent = workspace
+                waterPart = p
+            end
+            waterPart.CFrame = CFrame.new(h.Position.X, h.Position.Y - 3, h.Position.Z)
+        end)
+    else
+        ClearWater()
+    end
+
+    if not (State.AutoFarm or State.AutoRaid) then return end
+
+    pcall(function()
+        local range = State.AutoRaid and RAID_RANGE or FARM_RANGE
+        local enemy = GetEnemy(range)
+        if enemy then
+            FloatOnHead(enemy, dt)
+            BringSameName(enemy)
+            EnsureHoldWeapon()
+            DoAttack()
+        elseif State.AutoRaid then
+            FloatToNext(dt)
+        end
+    end)
+end)
+
+RunService.Stepped:Connect(function()
+    if not (State.AutoFarm or State.AutoRaid) then return end
+    pcall(function()
+        local c = Char()
+        if not c then return end
+        for _, p in ipairs(c:GetDescendants()) do
+            if p:IsA("BasePart") then p.CanCollide = false end
+        end
+    end)
+end)
+
+task.spawn(function()
+    local was = false
+    while true do
+        task.wait(0.4)
+        local now = State.AutoFarm or State.AutoRaid
+        if was and not now then
+            pcall(function()
+                local hum = Hum()
+                if hum then
+                    hum.AutoRotate = true
+                    hum.WalkSpeed = State.Speed and State.WalkSpeed or 16
+                    hum.JumpPower = 50
+                end
+            end)
+        end
+        if State.AutoRaid and not was then visited = {} end
+        was = now
+    end
+end)
+
+task.spawn(function()
+    while true do
+        task.wait(55)
+        pcall(function()
+            VU:CaptureController()
+            VU:ClickButton2(Vector2.new())
+        end)
+    end
+end)
+
+-------------------------------------------------
+-- UI
+-------------------------------------------------
+Window:DrawCategory({ Name = "Main" })
+
+local FarmTab = Window:DrawTab({
+    Name = "Farm",
+    Icon = "swords",
+    Type = "Single",
+    EnableScrolling = true,
+})
+
+local Sec = FarmTab:DrawSection({ Name = "Combat" })
+
+Sec:AddToggle({
+    Name = "Auto Farm",
+    Flag = "AutoFarm",
+    Default = false,
+    Callback = function(v) State.AutoFarm = v end,
+})
+
+Sec:AddToggle({
+    Name = "Auto Raid",
+    Flag = "AutoRaid",
+    Default = false,
+    Callback = function(v)
+        State.AutoRaid = v
+        if v then visited = {} end
+    end,
+})
+
+Sec:AddToggle({
+    Name = "Fast Attack",
+    Flag = "FastAttack",
+    Default = false,
+    Callback = function(v) State.FastAttack = v end,
+})
+
+Sec:AddToggle({
+    Name = "Bring Same Name Mobs",
+    Flag = "BringMobs",
+    Default = true,
+    Callback = function(v) State.BringMobs = v end,
+})
+
+Sec:AddToggle({
+    Name = "Speed + Water Walk",
+    Flag = "Speed",
+    Default = false,
+    Callback = function(v)
+        State.Speed = v
+        if not v then ClearWater() end
+    end,
+})
+
+Sec:AddParagraph({
+    Title = "D · M1 Attack",
+    Content = "Hold sword in hand first\nM1 auto · H5.5 · Bring same name\nLeftAlt = Toggle UI",
+})
+
+Window:DrawCategory({ Name = "System" })
+
+local SetTab = Window:DrawTab({
+    Name = "Settings",
+    Icon = "settings-3",
+    Type = "Single",
+    EnableScrolling = true,
+})
+
+local UISet = SetTab:DrawSection({ Name = "UI" })
+UISet:AddToggle({
+    Name = "Always Show",
+    Flag = "AlwaysShow",
+    Default = false,
+    Callback = function(v) Window.AlwayShowTab = v end,
+})
+UISet:AddParagraph({
+    Title = "Key",
+    Content = "LeftAlt = Toggle · D · DekuzXP",
+})
+
+pcall(function()
+    local cfg = Window:DrawConfig({
+        Name = "Config",
+        Icon = "folder",
+        Config = ConfigManager,
+    })
+    cfg:Init()
+end)
+
+Notifier.new({
+    Title = "D",
+    Content = "DekuzXP · hold sword then Auto Farm",
+    Duration = 6,
+    Icon = LOGO,
+})
+
+print("[D] DekuzXP ready")
+print("Hold sword -> Auto Farm ON")

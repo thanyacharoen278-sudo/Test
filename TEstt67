@@ -1,0 +1,495 @@
+--[[
+    DekuzXP | D · PVP
+    CompKiller · LeftAlt
+    Lock · Fly · Aim · Auto attack · Anti shake
+]]
+
+repeat task.wait() until game:IsLoaded()
+
+local LOGO = "rbxassetid://120245531583106"
+local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
+local VU = game:GetService("VirtualUser")
+local RS = game:GetService("ReplicatedStorage")
+local LP = Players.LocalPlayer
+repeat task.wait() until LP
+
+-------------------------------------------------
+-- CompKiller
+-------------------------------------------------
+local okLib, Compkiller = pcall(function()
+    return loadstring(game:HttpGet(
+        "https://raw.githubusercontent.com/4lpaca-pin/CompKiller/refs/heads/main/src/source.luau"
+    ))()
+end)
+if not okLib or not Compkiller then
+    warn("[D] UI load failed")
+    return
+end
+
+local Notifier = Compkiller.newNotify()
+local ConfigManager = Compkiller:ConfigManager({
+    Directory = "DekuzXP-PVP",
+    Config = "Main",
+})
+
+pcall(function()
+    Compkiller:Loader(LOGO, 0.7).yield()
+end)
+
+local Window = Compkiller.new({
+    Name = "D · PVP",
+    Keybind = "LeftAlt",
+    Logo = LOGO,
+    Scale = UDim2.fromOffset(380, 340),
+    TextSize = 12,
+})
+
+pcall(function()
+    Compkiller:SetTheme("Dark Blue")
+    local C = Compkiller.Colors
+    C.Highlight = Color3.fromRGB(70, 160, 255)
+    C.Toggle = Color3.fromRGB(50, 140, 255)
+    C.BGDBColor = Color3.fromRGB(12, 18, 36)
+    C.BlockBackground = Color3.fromRGB(18, 26, 48)
+    Compkiller:RefreshCurrentColor()
+end)
+
+-------------------------------------------------
+-- STATE
+-------------------------------------------------
+local State = {
+    Lock = false,
+    FlyTo = false,
+    AutoAttack = false,
+    Aimbot = false,
+    AntiShake = true,
+    TargetName = "None",
+}
+
+local LOCK_HEIGHT = 4
+local FLY_SPEED = 180
+local HITBOX = 55
+local AC = nil
+
+local function Char()
+    return LP.Character
+end
+local function Hum()
+    local c = Char()
+    return c and c:FindFirstChildOfClass("Humanoid")
+end
+local function HRP()
+    local c = Char()
+    return c and c:FindFirstChild("HumanoidRootPart")
+end
+
+local function GetTargetPlayer()
+    if State.TargetName == "None" or State.TargetName == "" then
+        return nil
+    end
+    return Players:FindFirstChild(State.TargetName)
+end
+
+local function GetTargetHRP()
+    local plr = GetTargetPlayer()
+    if not plr then return nil end
+    local c = plr.Character
+    if not c then return nil end
+    local hu = c:FindFirstChildOfClass("Humanoid")
+    if hu and hu.Health <= 0 then return nil end
+    return c:FindFirstChild("HumanoidRootPart")
+end
+
+-------------------------------------------------
+-- COMBAT
+-------------------------------------------------
+local function EquipWeapon()
+    pcall(function()
+        local char, hum = Char(), Hum()
+        if not char or not hum then return end
+        if char:FindFirstChildOfClass("Tool") then return end
+        local bag = LP:FindFirstChild("Backpack")
+        if not bag then return end
+        for _, t in ipairs(bag:GetChildren()) do
+            if t:IsA("Tool") then
+                local n = string.lower(t.Name)
+                if not string.find(n, "fruit", 1, true) and not string.find(n, "gum", 1, true) then
+                    hum:EquipTool(t)
+                    return
+                end
+            end
+        end
+        for _, t in ipairs(bag:GetChildren()) do
+            if t:IsA("Tool") then
+                hum:EquipTool(t)
+                return
+            end
+        end
+    end)
+end
+
+local function LoadCombat()
+    pcall(function()
+        local ps = LP:FindFirstChild("PlayerScripts")
+        if not ps then return end
+        local cf = ps:FindFirstChild("CombatFramework")
+        if cf then AC = require(cf) end
+    end)
+    pcall(function()
+        if AC and AC.activeController then return end
+        if type(getreg) == "function" then
+            for _, v in pairs(getreg()) do
+                if type(v) == "table" and rawget(v, "activeController") then
+                    AC = v
+                    break
+                end
+            end
+        end
+    end)
+end
+
+LoadCombat()
+LP.CharacterAdded:Connect(function()
+    task.wait(1)
+    AC = nil
+    LoadCombat()
+end)
+
+local function KillShake()
+    if not State.AntiShake then return end
+    pcall(function()
+        local util = RS:FindFirstChild("Util")
+        if util and util:FindFirstChild("CameraShaker") then
+            local m = require(util.CameraShaker)
+            if m and m.Stop then m:Stop() end
+        end
+    end)
+    pcall(function()
+        local ps = LP:FindFirstChild("PlayerScripts")
+        if not ps then return end
+        local cf = ps:FindFirstChild("CombatFramework")
+        if not cf then return end
+        local cam = cf:FindFirstChild("CameraShaker")
+        if cam then
+            local m = require(cam)
+            if m and m.CameraShakeInstance then
+                m.CameraShakeInstance.CameraShakeState = {
+                    FadingIn = 3, FadingOut = 2, Sustained = 0, Inactive = 1
+                }
+            end
+        end
+    end)
+end
+
+local function DoAttack()
+    KillShake()
+    EquipWeapon()
+    pcall(function()
+        if not AC then LoadCombat() end
+        local c = AC and AC.activeController
+        if c then
+            c.timeToNextAttack = 0
+            c.attacking = false
+            c.blocking = false
+            c.hitboxMagnitude = HITBOX
+            if type(c.increment) == "number" then c.increment = 1 end
+            if type(c.attack) == "function" then c:attack() end
+        end
+    end)
+    pcall(function()
+        local tool = Char() and Char():FindFirstChildOfClass("Tool")
+        if tool then tool:Activate() end
+    end)
+end
+
+-------------------------------------------------
+-- LOCK / FLY / AIM
+-------------------------------------------------
+local function SmoothMoveTo(goal, dt, speed)
+    local h = HRP()
+    if not h then return end
+    local cur = h.Position
+    local dist = (goal - cur).Magnitude
+    if dist < 1.5 then
+        h.CFrame = CFrame.new(goal) * (h.CFrame - h.CFrame.Position)
+        pcall(function()
+            h.AssemblyLinearVelocity = Vector3.zero
+            h.AssemblyAngularVelocity = Vector3.zero
+        end)
+        return
+    end
+    local step = math.min(dist, (speed or FLY_SPEED) * (dt or 0.016))
+    local dir = (goal - cur).Unit
+    local np = cur + dir * step
+    h.CFrame = CFrame.new(np, goal)
+    pcall(function()
+        h.AssemblyLinearVelocity = Vector3.zero
+        h.AssemblyAngularVelocity = Vector3.zero
+    end)
+end
+
+local function LockOnTarget(dt)
+    local th = GetTargetHRP()
+    local h = HRP()
+    if not th or not h then return end
+    local goal = th.Position + Vector3.new(0, LOCK_HEIGHT, 0)
+    SmoothMoveTo(goal, dt, FLY_SPEED)
+    local hum = Hum()
+    if hum then
+        hum.WalkSpeed = 0
+        hum.JumpPower = 0
+        hum.AutoRotate = false
+    end
+end
+
+local function AimAtTarget()
+    local th = GetTargetHRP()
+    local h = HRP()
+    if not th or not h then return end
+    local look = th.Position + Vector3.new(0, 1.6, 0)
+    local pos = h.Position
+    h.CFrame = CFrame.lookAt(pos, look)
+    pcall(function()
+        local cam = workspace.CurrentCamera
+        if cam then
+            cam.CFrame = CFrame.lookAt(cam.CFrame.Position, look)
+        end
+    end)
+end
+
+-------------------------------------------------
+-- LOOPS
+-------------------------------------------------
+RunService.Heartbeat:Connect(function(dt)
+    if State.AntiShake then KillShake() end
+    local needTarget = State.Lock or State.FlyTo or State.Aimbot or State.AutoAttack
+    if not needTarget then return end
+    if not GetTargetHRP() then return end
+    if State.Lock or State.FlyTo then
+        LockOnTarget(dt)
+    end
+    if State.Aimbot then
+        AimAtTarget()
+    end
+end)
+
+RunService.RenderStepped:Connect(function()
+    if not State.AutoAttack then return end
+    if not GetTargetHRP() then return end
+    pcall(function()
+        if not AC then LoadCombat() end
+        local c = AC and AC.activeController
+        if c then
+            c.timeToNextAttack = 0
+            c.hitboxMagnitude = HITBOX
+            c.attacking = false
+        end
+    end)
+    if State.AntiShake then KillShake() end
+end)
+
+task.spawn(function()
+    while true do
+        if State.AutoAttack and GetTargetHRP() then
+            DoAttack()
+            task.wait(0.06)
+        else
+            task.wait(0.15)
+        end
+    end
+end)
+
+RunService.Stepped:Connect(function()
+    if not (State.Lock or State.FlyTo) then return end
+    pcall(function()
+        local c = Char()
+        if not c then return end
+        for _, p in ipairs(c:GetDescendants()) do
+            if p:IsA("BasePart") then p.CanCollide = false end
+        end
+    end)
+end)
+
+task.spawn(function()
+    local was = false
+    while true do
+        task.wait(0.3)
+        local now = State.Lock or State.FlyTo
+        if was and not now then
+            pcall(function()
+                local hum = Hum()
+                if hum then
+                    hum.AutoRotate = true
+                    hum.WalkSpeed = 16
+                    hum.JumpPower = 50
+                end
+            end)
+        end
+        was = now
+    end
+end)
+
+task.spawn(function()
+    while true do
+        task.wait(55)
+        pcall(function()
+            VU:CaptureController()
+            VU:ClickButton2(Vector2.new())
+        end)
+    end
+end)
+
+-------------------------------------------------
+-- Player list (ไม่ใช้ \~= กันพังตอน copy)
+-------------------------------------------------
+local function PlayerList()
+    local list = { "None" }
+    for _, plr in ipairs(Players:GetPlayers()) do
+        if plr == LP then
+        else
+            table.insert(list, plr.Name)
+        end
+    end
+    table.sort(list)
+    -- จัด None ให้อยู่บนสุด
+    local out = { "None" }
+    for _, n in ipairs(list) do
+        if n == "None" then
+        else
+            table.insert(out, n)
+        end
+    end
+    return out
+end
+
+-------------------------------------------------
+-- UI
+-------------------------------------------------
+Window:DrawCategory({ Name = "PVP" })
+
+local Tab = Window:DrawTab({
+    Name = "Combat",
+    Icon = "swords",
+    Type = "Single",
+    EnableScrolling = true,
+})
+
+local Sec = Tab:DrawSection({ Name = "Target" })
+
+local dropRef = Sec:AddDropdown({
+    Name = "Select Player",
+    Flag = "TargetPlayer",
+    Default = "None",
+    Values = PlayerList(),
+    Callback = function(v)
+        State.TargetName = v
+    end,
+})
+
+Sec:AddButton({
+    Name = "Refresh Player List",
+    Callback = function()
+        pcall(function()
+            if dropRef and dropRef.SetValues then
+                dropRef:SetValues(PlayerList())
+            end
+        end)
+        Notifier.new({
+            Title = "D",
+            Content = "Player list refreshed",
+            Duration = 2,
+            Icon = LOGO,
+        })
+    end,
+})
+
+local Sec2 = Tab:DrawSection({ Name = "Actions" })
+
+Sec2:AddToggle({
+    Name = "Lock Player",
+    Flag = "Lock",
+    Default = false,
+    Callback = function(v) State.Lock = v end,
+})
+
+Sec2:AddToggle({
+    Name = "Fly To Player",
+    Flag = "FlyTo",
+    Default = false,
+    Callback = function(v) State.FlyTo = v end,
+})
+
+Sec2:AddToggle({
+    Name = "Aimbot",
+    Flag = "Aimbot",
+    Default = false,
+    Callback = function(v) State.Aimbot = v end,
+})
+
+Sec2:AddToggle({
+    Name = "Auto Attack",
+    Flag = "AutoAttack",
+    Default = false,
+    Callback = function(v) State.AutoAttack = v end,
+})
+
+Sec2:AddToggle({
+    Name = "Anti Shake",
+    Flag = "AntiShake",
+    Default = true,
+    Callback = function(v) State.AntiShake = v end,
+})
+
+Sec2:AddParagraph({
+    Title = "D · PVP",
+    Content = "1 Select player\n2 Lock / Fly / Aim / Attack\nHold weapon · LeftAlt",
+})
+
+Window:DrawCategory({ Name = "System" })
+local SetTab = Window:DrawTab({
+    Name = "Settings",
+    Icon = "settings-3",
+    Type = "Single",
+})
+local UISet = SetTab:DrawSection({ Name = "UI" })
+UISet:AddToggle({
+    Name = "Always Show",
+    Flag = "AlwaysShow",
+    Default = false,
+    Callback = function(v) Window.AlwayShowTab = v end,
+})
+
+pcall(function()
+    local cfg = Window:DrawConfig({
+        Name = "Config",
+        Icon = "folder",
+        Config = ConfigManager,
+    })
+    cfg:Init()
+end)
+
+Players.PlayerAdded:Connect(function()
+    task.wait(0.5)
+    pcall(function()
+        if dropRef and dropRef.SetValues then
+            dropRef:SetValues(PlayerList())
+        end
+    end)
+end)
+
+Players.PlayerRemoving:Connect(function(plr)
+    if State.TargetName == plr.Name then
+        State.TargetName = "None"
+    end
+end)
+
+Notifier.new({
+    Title = "D · PVP",
+    Content = "Select player then Lock / Attack",
+    Duration = 5,
+    Icon = LOGO,
+})
+
+print("[D] PVP ready")
+print("Select player -> Lock + Auto Attack · hold weapon")

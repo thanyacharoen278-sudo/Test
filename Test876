@@ -1,0 +1,493 @@
+--[[
+    DekuzXP | D · PVP
+    M1 = VIM + CombatFramework + Tool
+    LeftAlt = UI
+]]
+
+repeat task.wait() until game:IsLoaded()
+
+local LOGO = "rbxassetid://120245531583106"
+local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
+local VU = game:GetService("VirtualUser")
+local RS = game:GetService("ReplicatedStorage")
+local LP = Players.LocalPlayer
+repeat task.wait() until LP
+
+local VIM
+pcall(function()
+    VIM = game:GetService("VirtualInputManager")
+end)
+
+local okLib, Compkiller = pcall(function()
+    return loadstring(game:HttpGet(
+        "https://raw.githubusercontent.com/4lpaca-pin/CompKiller/refs/heads/main/src/source.luau"
+    ))()
+end)
+if not okLib or not Compkiller then
+    warn("[D] CompKiller failed")
+    return
+end
+
+local Notifier = Compkiller.newNotify()
+pcall(function() Compkiller:Loader(LOGO, 0.35).yield() end)
+
+local Window = Compkiller.new({
+    Name = "D · PVP",
+    Keybind = "LeftAlt",
+    Logo = LOGO,
+    Scale = UDim2.fromOffset(320, 300),
+    TextSize = 11,
+})
+
+pcall(function()
+    Compkiller:SetTheme("Dark Blue")
+    local C = Compkiller.Colors
+    C.Highlight = Color3.fromRGB(70, 160, 255)
+    C.Toggle = Color3.fromRGB(50, 140, 255)
+    C.BGDBColor = Color3.fromRGB(12, 18, 36)
+    Compkiller:RefreshCurrentColor()
+end)
+
+local ON = {
+    Lock = false,
+    Fly = false,
+    Aim = false,
+    Attack = false,
+    Shake = true,
+    Nearest = true,
+}
+
+local TargetName = ""
+local LOCK_Y = 3.5
+local FLY_SPEED = 700
+local HITBOX = 300
+local AC = nil
+local m1Busy = false
+
+local function Char()
+    return LP.Character
+end
+local function Hum()
+    local c = Char()
+    return c and c:FindFirstChildOfClass("Humanoid")
+end
+local function HRP()
+    local c = Char()
+    return c and c:FindFirstChild("HumanoidRootPart")
+end
+
+local function say(t)
+    print("[D]", t)
+    pcall(function()
+        Notifier.new({ Title = "D", Content = t, Duration = 2, Icon = LOGO })
+    end)
+end
+
+local function Nearest()
+    local h = HRP()
+    if not h then return nil end
+    local best, bestD = nil, 1e9
+    for _, p in ipairs(Players:GetPlayers()) do
+        if p == LP then
+        else
+            local ch = p.Character
+            if ch then
+                local hum = ch:FindFirstChildOfClass("Humanoid")
+                local root = ch:FindFirstChild("HumanoidRootPart")
+                if root and hum and hum.Health > 0 then
+                    local d = (h.Position - root.Position).Magnitude
+                    if d < bestD then
+                        best = p
+                        bestD = d
+                    end
+                end
+            end
+        end
+    end
+    return best
+end
+
+local function TargetRoot()
+    local plr = nil
+    if ON.Nearest or TargetName == "" then
+        plr = Nearest()
+        if plr then TargetName = plr.Name end
+    else
+        plr = Players:FindFirstChild(TargetName)
+        if not plr then
+            plr = Nearest()
+            if plr then TargetName = plr.Name end
+        end
+    end
+    if not plr or not plr.Character then return nil end
+    local hum = plr.Character:FindFirstChildOfClass("Humanoid")
+    if hum and hum.Health <= 0 then return nil end
+    return plr.Character:FindFirstChild("HumanoidRootPart")
+end
+
+local function Equip()
+    pcall(function()
+        local c, hum = Char(), Hum()
+        if not c or not hum then return end
+        if c:FindFirstChildOfClass("Tool") then return end
+        local bag = LP:FindFirstChild("Backpack")
+        if not bag then return end
+        for _, t in ipairs(bag:GetChildren()) do
+            if t:IsA("Tool") then
+                local n = string.lower(t.Name)
+                if not string.find(n, "fruit", 1, true) and not string.find(n, "gum", 1, true) then
+                    hum:EquipTool(t)
+                    return
+                end
+            end
+        end
+        for _, t in ipairs(bag:GetChildren()) do
+            if t:IsA("Tool") then
+                hum:EquipTool(t)
+                return
+            end
+        end
+    end)
+end
+
+local function LoadCF()
+    pcall(function()
+        local ps = LP:FindFirstChild("PlayerScripts")
+        local cf = ps and ps:FindFirstChild("CombatFramework")
+        if cf then AC = require(cf) end
+    end)
+    pcall(function()
+        if AC and AC.activeController then return end
+        if type(getreg) == "function" then
+            for _, v in pairs(getreg()) do
+                if type(v) == "table" and rawget(v, "activeController") then
+                    AC = v
+                    break
+                end
+            end
+        end
+    end)
+end
+LoadCF()
+task.spawn(function()
+    for _ = 1, 15 do
+        if AC and AC.activeController then break end
+        LoadCF()
+        task.wait(0.35)
+    end
+end)
+LP.CharacterAdded:Connect(function()
+    task.wait(1)
+    AC = nil
+    LoadCF()
+end)
+
+local function NoShake()
+    if not ON.Shake then return end
+    pcall(function()
+        local u = RS:FindFirstChild("Util")
+        local s = u and u:FindFirstChild("CameraShaker")
+        if s then
+            local m = require(s)
+            if m and m.Stop then m:Stop() end
+        end
+    end)
+    pcall(function()
+        local ps = LP:FindFirstChild("PlayerScripts")
+        local cf = ps and ps:FindFirstChild("CombatFramework")
+        local cam = cf and cf:FindFirstChild("CameraShaker")
+        if cam then
+            local m = require(cam)
+            if m and m.CameraShakeInstance then
+                m.CameraShakeInstance.CameraShakeState = {
+                    FadingIn = 3, FadingOut = 2, Sustained = 0, Inactive = 1
+                }
+            end
+        end
+    end)
+end
+
+-------------------------------------------------
+-- M1 AUTO = VIM + Framework + Tool
+-------------------------------------------------
+local function M1()
+    if m1Busy then return end
+    m1Busy = true
+
+    task.spawn(function()
+        pcall(function()
+            NoShake()
+            Equip()
+
+            -- 1) CombatFramework
+            if not AC then LoadCF() end
+            local c = AC and AC.activeController
+            if c then
+                c.timeToNextAttack = 0
+                c.attacking = false
+                c.blocking = false
+                c.hitboxMagnitude = HITBOX
+                if type(c.increment) == "number" then c.increment = 1 end
+                if type(c.attack) == "function" then
+                    c:attack()
+                end
+            end
+
+            -- 2) Tool Activate
+            local tool = Char() and Char():FindFirstChildOfClass("Tool")
+            if tool then tool:Activate() end
+
+            -- 3) VirtualInputManager = M1 จริงของเกม
+            if VIM then
+                local cam = workspace.CurrentCamera
+                local vp = cam and cam.ViewportSize or Vector2.new(800, 600)
+                local x, y = vp.X / 2, vp.Y / 2
+                VIM:SendMouseButtonEvent(x, y, 0, true, game, 1)
+                task.wait(0.03)
+                VIM:SendMouseButtonEvent(x, y, 0, false, game, 1)
+            end
+
+            -- 4) สำรอง VirtualUser (บาง executor)
+            pcall(function()
+                VU:CaptureController()
+                VU:Button1Down(Vector2.new(0, 0))
+                task.wait(0.03)
+                VU:Button1Up(Vector2.new(0, 0))
+            end)
+        end)
+        m1Busy = false
+    end)
+end
+
+-------------------------------------------------
+-- บิน
+-------------------------------------------------
+local function GoTo(goal, dt)
+    local h = HRP()
+    if not h then return end
+    local cur = h.Position
+    local dist = (goal - cur).Magnitude
+    if dist < 1.2 then
+        h.CFrame = CFrame.new(goal)
+    elseif dist > 250 then
+        h.CFrame = CFrame.new(cur + (goal - cur).Unit * 220, goal)
+    else
+        local alpha = math.clamp((dt or 0.016) * (FLY_SPEED / 40), 0.15, 0.55)
+        h.CFrame = CFrame.new(cur:Lerp(goal, alpha), goal)
+    end
+    pcall(function()
+        h.AssemblyLinearVelocity = Vector3.zero
+        h.AssemblyAngularVelocity = Vector3.zero
+    end)
+    local hum = Hum()
+    if hum then
+        hum.WalkSpeed = 0
+        hum.JumpPower = 0
+        hum.AutoRotate = false
+    end
+end
+
+local function Aim()
+    local th = TargetRoot()
+    local h = HRP()
+    if not th or not h then return end
+    local look = th.Position + Vector3.new(0, 1.5, 0)
+    h.CFrame = CFrame.lookAt(h.Position, look)
+    pcall(function()
+        local cam = workspace.CurrentCamera
+        if cam then cam.CFrame = CFrame.lookAt(cam.CFrame.Position, look) end
+    end)
+end
+
+RunService.RenderStepped:Connect(function(dt)
+    if ON.Shake then NoShake() end
+    local need = ON.Lock or ON.Fly or ON.Aim or ON.Attack
+    if not need then return end
+    local th = TargetRoot()
+    if not th then return end
+    if ON.Lock or ON.Fly then
+        GoTo(th.Position + Vector3.new(0, LOCK_Y, 0), dt)
+    end
+    if ON.Aim then Aim() end
+    if ON.Attack then
+        pcall(function()
+            if not AC then LoadCF() end
+            local c = AC and AC.activeController
+            if c then
+                c.timeToNextAttack = 0
+                c.hitboxMagnitude = HITBOX
+                c.attacking = false
+            end
+        end)
+    end
+end)
+
+RunService.Stepped:Connect(function()
+    if not (ON.Lock or ON.Fly) then return end
+    pcall(function()
+        local c = Char()
+        if not c then return end
+        for _, p in ipairs(c:GetDescendants()) do
+            if p:IsA("BasePart") then p.CanCollide = false end
+        end
+    end)
+end)
+
+task.spawn(function()
+    while true do
+        if ON.Attack and TargetRoot() then
+            M1()
+            task.wait(0.05)
+        else
+            task.wait(0.1)
+        end
+    end
+end)
+
+task.spawn(function()
+    local was = false
+    while true do
+        task.wait(0.25)
+        local now = ON.Lock or ON.Fly
+        if was and not now then
+            pcall(function()
+                local hum = Hum()
+                if hum then
+                    hum.AutoRotate = true
+                    hum.WalkSpeed = 16
+                    hum.JumpPower = 50
+                end
+            end)
+        end
+        was = now
+    end
+end)
+
+task.spawn(function()
+    while true do
+        task.wait(50)
+        pcall(function()
+            VU:CaptureController()
+            VU:ClickButton2(Vector2.new())
+        end)
+    end
+end)
+
+local function names()
+    local t = { "Nearest" }
+    for _, p in ipairs(Players:GetPlayers()) do
+        if p == LP then
+        else
+            table.insert(t, p.Name)
+        end
+    end
+    return t
+end
+
+Window:DrawCategory({ Name = "PVP" })
+local Tab = Window:DrawTab({
+    Name = "Combat",
+    Icon = "swords",
+    Type = "Single",
+    EnableScrolling = true,
+})
+
+local A = Tab:DrawSection({ Name = "Target" })
+A:AddToggle({
+    Name = "Nearest Player",
+    Default = true,
+    Callback = function(v)
+        ON.Nearest = v and true or false
+        if ON.Nearest then
+            local n = Nearest()
+            say(n and ("Near: " .. n.Name) or "No players")
+        end
+    end,
+})
+A:AddDropdown({
+    Name = "Player",
+    Default = "Nearest",
+    Values = names(),
+    Callback = function(v)
+        if v == "Nearest" then
+            ON.Nearest = true
+            TargetName = ""
+        else
+            ON.Nearest = false
+            TargetName = v
+        end
+        say("Target = " .. tostring(v))
+    end,
+})
+A:AddButton({
+    Name = "Pick Nearest",
+    Callback = function()
+        local n = Nearest()
+        if n then
+            TargetName = n.Name
+            ON.Nearest = true
+            say("Target: " .. n.Name)
+        else
+            say("No other players")
+        end
+    end,
+})
+
+local B = Tab:DrawSection({ Name = "Actions" })
+B:AddToggle({
+    Name = "LOCK",
+    Default = false,
+    Callback = function(v)
+        ON.Lock = v and true or false
+        if ON.Lock then
+            local n = Nearest()
+            say(n and ("LOCK -> " .. n.Name) or "LOCK (no target)")
+        else
+            say("LOCK off")
+        end
+    end,
+})
+B:AddToggle({
+    Name = "FLY",
+    Default = false,
+    Callback = function(v)
+        ON.Fly = v and true or false
+        say(ON.Fly and "FLY on" or "FLY off")
+    end,
+})
+B:AddToggle({
+    Name = "AIM",
+    Default = false,
+    Callback = function(v)
+        ON.Aim = v and true or false
+        say(ON.Aim and "AIM on" or "AIM off")
+    end,
+})
+B:AddToggle({
+    Name = "M1 AUTO",
+    Default = false,
+    Callback = function(v)
+        ON.Attack = v and true or false
+        if ON.Attack then
+            Equip()
+            LoadCF()
+            if not VIM then
+                say("VIM missing · using VU")
+            end
+        end
+        say(ON.Attack and "M1 AUTO on" or "M1 AUTO off")
+    end,
+})
+B:AddToggle({
+    Name = "Anti Shake",
+    Default = true,
+    Callback = function(v) ON.Shake = v and true or false end,
+})
+B:AddParagraph({
+    Title = "Tip",
+    Content = "Hold sword first\nLOCK + AIM + M1 AUTO\nVIM = game M1",
+})
+
+say("M1 = VIM + Framework + Tool")
+print("[D] VIM M1 ready")

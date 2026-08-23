@@ -1,0 +1,670 @@
+--[[
+    Dekuz | BF Farm
+    CompKiller UI · LeftAlt
+    Sea1 + Sea2 + Sea3 · ลอยบนหัว · M1 · CommF_
+]]
+
+repeat task.wait() until game:IsLoaded()
+
+local DKLogo = "rbxassetid://79388793482159"
+local Players = game:GetService("Players")
+local RS = game:GetService("ReplicatedStorage")
+local RunService = game:GetService("RunService")
+local LP = Players.LocalPlayer
+repeat task.wait() until LP
+
+local VIM
+pcall(function() VIM = game:GetService("VirtualInputManager") end)
+
+-------------------------------------------------
+-- CompKiller / Dekuz UI
+-------------------------------------------------
+local okLib, Compkiller = pcall(function()
+    return loadstring(game:HttpGet(
+        "https://raw.githubusercontent.com/4lpaca-pin/CompKiller/refs/heads/main/src/source.luau"
+    ))()
+end)
+if not okLib or not Compkiller then
+    warn("[DK] CompKiller load failed")
+    return
+end
+
+local Notifier = Compkiller.newNotify()
+local ConfigManager = Compkiller:ConfigManager({
+    Directory = "Dekuz-BF",
+    Config = "Main",
+})
+
+pcall(function()
+    Compkiller:Loader(DKLogo, 1.0).yield()
+end)
+
+local Window = Compkiller.new({
+    Name = "Dekuz",
+    Keybind = "LeftAlt",
+    Logo = DKLogo,
+    Scale = Compkiller.Scale.Window,
+    TextSize = 14,
+})
+
+pcall(function()
+    Compkiller:SetTheme("Dark Blue")
+    local C = Compkiller.Colors
+    C.Highlight = Color3.fromRGB(70, 160, 255)
+    C.Toggle = Color3.fromRGB(50, 140, 255)
+    C.BGDBColor = Color3.fromRGB(12, 18, 36)
+    Compkiller:RefreshCurrentColor()
+end)
+
+local Watermark = Window:Watermark()
+Watermark:AddText({ Icon = "user", Text = "DK" })
+Watermark:AddText({ Icon = "clock", Text = Compkiller:GetDate() })
+local TimeWm = Watermark:AddText({ Icon = "timer", Text = "TIME" })
+task.spawn(function()
+    while true do
+        task.wait(1)
+        pcall(function() TimeWm:SetText(Compkiller:GetTimeNow()) end)
+    end
+end)
+
+-------------------------------------------------
+-- QUEST DATA Sea1 + Sea2 + Sea3
+-------------------------------------------------
+local QuestData = {
+    -- SEA 3
+    { minLevel = 2725, mon = "Grand Devotee", quest = "SubmergedQuest3", questId = 2 },
+    { minLevel = 2700, mon = "High Disciple", quest = "SubmergedQuest3", questId = 1 },
+    { minLevel = 2675, mon = "Ocean Prophet", quest = "SubmergedQuest2", questId = 2 },
+    { minLevel = 2650, mon = "Sea Chanter", quest = "SubmergedQuest2", questId = 1 },
+    { minLevel = 2625, mon = "Coral Pirate", quest = "SubmergedQuest1", questId = 2 },
+    { minLevel = 2600, mon = "Reef Bandit", quest = "SubmergedQuest1", questId = 1 },
+    { minLevel = 2575, mon = "Skulls Slayer", quest = "TikiQuest3", questId = 2 },
+    { minLevel = 2550, mon = "Serpent Hunter", quest = "TikiQuest3", questId = 1 },
+    { minLevel = 2525, mon = "Isle Champion", quest = "TikiQuest2", questId = 2 },
+    { minLevel = 2500, mon = "Sun-kissed Warrior", quest = "TikiQuest2", questId = 1 },
+    { minLevel = 2475, mon = "Island Boy", quest = "TikiQuest1", questId = 2 },
+    { minLevel = 2450, mon = "Isle Outlaw", quest = "TikiQuest1", questId = 1 },
+    { minLevel = 2425, mon = "Snow Demon", quest = "CandyCaneQuest", questId = 2 },
+    { minLevel = 2400, mon = "Candy Pirate", quest = "CandyCaneQuest", questId = 1 },
+    { minLevel = 2375, mon = "Candy Rebel", quest = "ChocolateQuest2", questId = 2 },
+    { minLevel = 2350, mon = "Sweet Thief", quest = "ChocolateQuest2", questId = 1 },
+    { minLevel = 2325, mon = "Chocolate Bar Battler", quest = "ChocolateQuest1", questId = 2 },
+    { minLevel = 2300, mon = "Cocoa Warrior", quest = "ChocolateQuest1", questId = 1 },
+    { minLevel = 2275, mon = "Head Baker", quest = "CakeQuest2", questId = 2 },
+    { minLevel = 2250, mon = "Baking Staff", quest = "CakeQuest2", questId = 1 },
+    { minLevel = 2225, mon = "Cake Guard", quest = "CakeQuest1", questId = 2 },
+    { minLevel = 2200, mon = "Cookie Crafter", quest = "CakeQuest1", questId = 1 },
+    { minLevel = 2175, mon = "Cake Queen", quest = "IceCreamQuest", questId = 3 },
+    { minLevel = 2150, mon = "Ice Cream Commander", quest = "IceCreamQuest", questId = 2 },
+    { minLevel = 2125, mon = "Ice Cream Chef", quest = "IceCreamQuest", questId = 1 },
+    { minLevel = 2100, mon = "Peanut President", quest = "PeanutQuest", questId = 2 },
+    { minLevel = 2075, mon = "Peanut Scout", quest = "PeanutQuest", questId = 1 },
+    { minLevel = 2050, mon = "Possessed Mummy", quest = "HauntedQuest2", questId = 2 },
+    { minLevel = 2025, mon = "Demonic Soul", quest = "HauntedQuest2", questId = 1 },
+    { minLevel = 2000, mon = "Living Zombie", quest = "HauntedQuest1", questId = 2 },
+    { minLevel = 1975, mon = "Reborn Skeleton", quest = "HauntedQuest1", questId = 1 },
+    { minLevel = 1950, mon = "Beautiful Pirate", quest = "DeepForestArea2", questId = 3 },
+    { minLevel = 1925, mon = "Musketeer Pirate", quest = "DeepForestArea2", questId = 2 },
+    { minLevel = 1900, mon = "Jungle Pirate", quest = "DeepForestArea2", questId = 1 },
+    { minLevel = 1875, mon = "Captain Elephant", quest = "DeepForestQuest", questId = 3 },
+    { minLevel = 1850, mon = "Mythological Pirate", quest = "DeepForestQuest", questId = 2 },
+    { minLevel = 1825, mon = "Forest Pirate", quest = "DeepForestQuest", questId = 1 },
+    { minLevel = 1800, mon = "Fishman Captain", quest = "TurtleAdventureQuest", questId = 2 },
+    { minLevel = 1775, mon = "Fishman Raider", quest = "TurtleAdventureQuest", questId = 1 },
+    { minLevel = 1750, mon = "Kilo Admiral", quest = "MarineTreeQuest", questId = 3 },
+    { minLevel = 1725, mon = "Marine Rear Admiral", quest = "MarineTreeQuest", questId = 2 },
+    { minLevel = 1700, mon = "Marine Commodore", quest = "MarineTreeQuest", questId = 1 },
+    { minLevel = 1675, mon = "Hydra Leader", quest = "HydraTownQuest", questId = 3 },
+    { minLevel = 1650, mon = "Venomous Assailant", quest = "HydraTownQuest", questId = 2 },
+    { minLevel = 1625, mon = "Hydra Enforcer", quest = "HydraTownQuest", questId = 1 },
+    { minLevel = 1600, mon = "Dragon Crew Archer", quest = "DragonCrewQuest", questId = 2 },
+    { minLevel = 1575, mon = "Dragon Crew Warrior", quest = "DragonCrewQuest", questId = 1 },
+    { minLevel = 1550, mon = "Stone", quest = "PiratePortQuest", questId = 3 },
+    { minLevel = 1525, mon = "Pistol Billionaire", quest = "PiratePortQuest", questId = 2 },
+    { minLevel = 1500, mon = "Pirate Millionaire", quest = "PiratePortQuest", questId = 1 },
+    -- SEA 2
+    { minLevel = 1475, mon = "Tide Keeper", quest = "ForgottenQuest", questId = 3 },
+    { minLevel = 1450, mon = "Water Fighter", quest = "ForgottenQuest", questId = 2 },
+    { minLevel = 1425, mon = "Sea Soldier", quest = "ForgottenQuest", questId = 1 },
+    { minLevel = 1400, mon = "Awakened Ice Admiral", quest = "FrostQuest", questId = 3 },
+    { minLevel = 1375, mon = "Snow Lurker", quest = "FrostQuest", questId = 2 },
+    { minLevel = 1350, mon = "Arctic Warrior", quest = "FrostQuest", questId = 1 },
+    { minLevel = 1325, mon = "Ship Officer", quest = "FrontCrewQuest", questId = 2 },
+    { minLevel = 1300, mon = "Ship Steward", quest = "FrontCrewQuest", questId = 1 },
+    { minLevel = 1275, mon = "Ship Engineer", quest = "RearCrewQuest", questId = 2 },
+    { minLevel = 1250, mon = "Ship Deckhand", quest = "RearCrewQuest", questId = 1 },
+    { minLevel = 1200, mon = "Lava Pirate", quest = "FireQuest", questId = 2 },
+    { minLevel = 1175, mon = "Magma Ninja", quest = "FireQuest", questId = 1 },
+    { minLevel = 1150, mon = "Smoke Admiral", quest = "IceQuest", questId = 3 },
+    { minLevel = 1125, mon = "Horned Warrior", quest = "IceQuest", questId = 2 },
+    { minLevel = 1100, mon = "Lab Subordinate", quest = "IceQuest", questId = 1 },
+    { minLevel = 1050, mon = "Winter Warrior", quest = "SnowQuest2", questId = 2 },
+    { minLevel = 1000, mon = "Snow Trooper", quest = "SnowQuest2", questId = 1 },
+    { minLevel = 975, mon = "Vampire", quest = "GraveyardQuest", questId = 2 },
+    { minLevel = 950, mon = "Zombie", quest = "GraveyardQuest", questId = 1 },
+    { minLevel = 925, mon = "Orbitus", quest = "MarineQuest2", questId = 3 },
+    { minLevel = 900, mon = "Marine Captain", quest = "MarineQuest2", questId = 2 },
+    { minLevel = 875, mon = "Marine Lieutenant", quest = "MarineQuest2", questId = 1 },
+    { minLevel = 850, mon = "Jeremy", quest = "Area2Quest", questId = 3 },
+    { minLevel = 800, mon = "Factory Staff", quest = "Area2Quest", questId = 2 },
+    { minLevel = 775, mon = "Swan Pirate", quest = "Area2Quest", questId = 1 },
+    { minLevel = 750, mon = "Diamond", quest = "Area1Quest", questId = 3 },
+    { minLevel = 725, mon = "Mercenary", quest = "Area1Quest", questId = 2 },
+    { minLevel = 700, mon = "Raider", quest = "Area1Quest", questId = 1 },
+    -- SEA 1
+    { minLevel = 675, mon = "Cyborg", quest = "FountainQuest", questId = 3 },
+    { minLevel = 650, mon = "Galley Captain", quest = "FountainQuest", questId = 2 },
+    { minLevel = 625, mon = "Galley Pirate", quest = "FountainQuest", questId = 1 },
+    { minLevel = 575, mon = "Thunder God", quest = "SkyQuest2", questId = 4 },
+    { minLevel = 550, mon = "Royal Soldier", quest = "SkyQuest2", questId = 3 },
+    { minLevel = 525, mon = "Royal Squad", quest = "SkyQuest2", questId = 2 },
+    { minLevel = 500, mon = "Wysper", quest = "SkyQuest2", questId = 1 },
+    { minLevel = 475, mon = "Shanda", quest = "SkyQuest2", questId = 0 },
+    { minLevel = 450, mon = "God's Guard", quest = "SkyQuest", questId = 1 },
+    { minLevel = 425, mon = "Fishman Lord", quest = "FishmanQuest", questId = 3 },
+    { minLevel = 400, mon = "Fishman Commando", quest = "FishmanQuest", questId = 2 },
+    { minLevel = 375, mon = "Fishman Warrior", quest = "FishmanQuest", questId = 1 },
+    { minLevel = 350, mon = "Magma Admiral", quest = "MagmaQuest", questId = 3 },
+    { minLevel = 325, mon = "Military Spy", quest = "MarineQuest3", questId = 2 },
+    { minLevel = 300, mon = "Military Soldier", quest = "MarineQuest3", questId = 1 },
+    { minLevel = 275, mon = "Gladiator", quest = "ColosseumQuest", questId = 2 },
+    { minLevel = 250, mon = "Toga Warrior", quest = "ColosseumQuest", questId = 1 },
+    { minLevel = 240, mon = "Swan", quest = "ImpelQuest", questId = 5 },
+    { minLevel = 230, mon = "Chief Warden", quest = "ImpelQuest", questId = 4 },
+    { minLevel = 220, mon = "Warden", quest = "ImpelQuest", questId = 3 },
+    { minLevel = 210, mon = "Dangerous Prisoner", quest = "ImpelQuest", questId = 2 },
+    { minLevel = 190, mon = "Prisoner", quest = "ImpelQuest", questId = 1 },
+    { minLevel = 175, mon = "Dark Master", quest = "SkyQuest", questId = 2 },
+    { minLevel = 150, mon = "Sky Bandit", quest = "SkyQuest", questId = 1 },
+    { minLevel = 130, mon = "Vice Admiral", quest = "MarineQuest", questId = 2 },
+    { minLevel = 120, mon = "Chief Petty Officer", quest = "MarineQuest", questId = 1 },
+    { minLevel = 105, mon = "Yeti", quest = "SnowQuest", questId = 3 },
+    { minLevel = 100, mon = "Snowman", quest = "SnowQuest", questId = 2 },
+    { minLevel = 90, mon = "Snow Bandit", quest = "SnowQuest", questId = 1 },
+    { minLevel = 75, mon = "Desert Officer", quest = "DesertQuest", questId = 2 },
+    { minLevel = 60, mon = "Desert Bandit", quest = "DesertQuest", questId = 1 },
+    { minLevel = 55, mon = "Chef", quest = "BuggyQuest1", questId = 3 },
+    { minLevel = 40, mon = "Brute", quest = "BuggyQuest1", questId = 2 },
+    { minLevel = 30, mon = "Pirate", quest = "BuggyQuest1", questId = 1 },
+    { minLevel = 20, mon = "Gorilla King", quest = "JungleQuest", questId = 3 },
+    { minLevel = 15, mon = "Gorilla", quest = "JungleQuest", questId = 2 },
+    { minLevel = 10, mon = "Monkey", quest = "JungleQuest", questId = 1 },
+    { minLevel = 0, mon = "Bandit", quest = "BanditQuest1", questId = 1 },
+    { minLevel = 0, mon = "Trainee", quest = "MarineQuest0", questId = 1 },
+}
+
+local FLOAT_HEIGHT = 5.7
+local HITBOX = 400
+local FARM_SPEED = 0.04
+
+local State = {
+    SelectWeapon = "None",
+    SelectMon = nil,
+    AutoEquip = false,
+    AutoFarmLevel = false,
+    AutoFarmMon = false,
+}
+
+local Current = nil
+local AC = nil
+
+local function Char()
+    return LP.Character
+end
+local function Hum()
+    local c = Char()
+    return c and c:FindFirstChildOfClass("Humanoid")
+end
+local function HRP()
+    local c = Char()
+    return c and c:FindFirstChild("HumanoidRootPart")
+end
+
+local function GetLevel()
+    local ok, v = pcall(function()
+        return LP.Data.Level.Value
+    end)
+    return ok and v or 0
+end
+
+local function CommF_(...)
+    local args = { ... }
+    return pcall(function()
+        return RS:WaitForChild("Remotes"):WaitForChild("CommF_"):InvokeServer(unpack(args))
+    end)
+end
+
+local function EquipTool(name)
+    if not name or name == "None" then return end
+    pcall(function()
+        local hum, char = Hum(), Char()
+        if not hum or not char then return end
+        if char:FindFirstChild(name) then return end
+        local bag = LP:FindFirstChild("Backpack")
+        if not bag then return end
+        local t = bag:FindFirstChild(name)
+        if t and t:IsA("Tool") then hum:EquipTool(t) end
+    end)
+end
+
+local function CheckQuest()
+    local level = GetLevel()
+    Current = nil
+    for _, q in ipairs(QuestData) do
+        if level >= q.minLevel then
+            Current = q
+            return
+        end
+    end
+end
+
+local function HasQuest()
+    local ok, vis = pcall(function()
+        return LP.PlayerGui.Main.Quest.Visible
+    end)
+    return ok and vis == true
+end
+
+local function TakeQuest()
+    if not Current then return end
+    CommF_("StartQuest", Current.quest, Current.questId or 1)
+end
+
+local function FindMob(name)
+    if not name then return nil end
+    local h = HRP()
+    if not h then return nil end
+    local best, bestD = nil, 1e9
+
+    local function consider(m)
+        if not m or not m:IsA("Model") then return end
+        if m.Name == name then
+        else
+            return
+        end
+        local hum = m:FindFirstChildOfClass("Humanoid")
+        local root = m:FindFirstChild("HumanoidRootPart")
+        if not hum or not root or hum.Health <= 0 then return end
+        local d = (h.Position - root.Position).Magnitude
+        if d < bestD then best, bestD = m, d end
+    end
+
+    pcall(function()
+        local folder = workspace:FindFirstChild("Enemies")
+        if folder then
+            for _, m in ipairs(folder:GetChildren()) do consider(m) end
+        end
+        for _, m in ipairs(workspace:GetChildren()) do
+            if m:IsA("Model") then consider(m) end
+        end
+    end)
+    return best
+end
+
+local function LoadCombat()
+    pcall(function()
+        local ps = LP:FindFirstChild("PlayerScripts")
+        local cf = ps and ps:FindFirstChild("CombatFramework")
+        if cf then AC = require(cf) end
+    end)
+    pcall(function()
+        if AC and AC.activeController then return end
+        if type(getreg) == "function" then
+            for _, v in pairs(getreg()) do
+                if type(v) == "table" and rawget(v, "activeController") then
+                    AC = v
+                    break
+                end
+            end
+        end
+    end)
+end
+LoadCombat()
+LP.CharacterAdded:Connect(function()
+    task.wait(1)
+    AC = nil
+    LoadCombat()
+end)
+
+local function NoShake()
+    pcall(function()
+        local util = RS:FindFirstChild("Util")
+        local s = util and util:FindFirstChild("CameraShaker")
+        if s then
+            local m = require(s)
+            if m and m.Stop then m:Stop() end
+        end
+    end)
+end
+
+local function FloatTo(mob, dt)
+    local h = HRP()
+    if not h or not mob then return end
+    local root = mob:FindFirstChild("HumanoidRootPart")
+    if not root then return end
+    local goal = root.Position + Vector3.new(0, FLOAT_HEIGHT, 0)
+    local cur = h.Position
+    local dist = (goal - cur).Magnitude
+    local newPos
+    if dist > 80 then
+        newPos = cur + (goal - cur).Unit * 70
+    elseif dist > 1.5 then
+        local a = math.clamp((dt or 0.016) * 14, 0.15, 0.45)
+        newPos = cur:Lerp(goal, a)
+    else
+        newPos = goal
+    end
+    h.CFrame = CFrame.lookAt(newPos, root.Position + Vector3.new(0, 0.5, 0))
+    pcall(function()
+        h.AssemblyLinearVelocity = Vector3.zero
+        h.AssemblyAngularVelocity = Vector3.zero
+    end)
+    local hum = Hum()
+    if hum then
+        hum.WalkSpeed = 0
+        hum.JumpPower = 0
+        hum.AutoRotate = false
+    end
+end
+
+local function DoM1()
+    NoShake()
+
+    -- Equip Weapon
+    if State.SelectWeapon then
+        EquipTool(State.SelectWeapon)
+    end
+
+    -- CombatFramework Fast Attack
+    pcall(function()
+        if not AC then
+            LoadCombat()
+        end
+
+        local c = AC and AC.activeController
+        if c then
+            c.timeToNextAttack = 0
+            c.attacking = false
+            c.blocking = false
+
+            -- Fast Attack
+            c.hitboxMagnitude = 120
+
+            if type(c.increment) == "number" then
+                c.increment = 3
+            end
+
+            if type(c.attack) == "function" then
+                c:attack()
+            end
+        end
+    end)
+
+    -- Tool Activate
+    pcall(function()
+        local char = Char()
+        local tool = char and char:FindFirstChildOfClass("Tool")
+
+        if tool then
+            tool:Activate()
+        end
+    end)
+
+    -- VirtualInputManager M1
+    pcall(function()
+        if not VIM then return end
+
+        local cam = workspace.CurrentCamera
+        local vp = cam and cam.ViewportSize or Vector2.new(800, 600)
+
+        local x = vp.X / 2
+        local y = vp.Y / 2
+
+        VIM:SendMouseButtonEvent(
+            x, y, 0, true, game, 1
+        )
+
+        task.wait(0.02)
+
+        VIM:SendMouseButtonEvent(
+            x, y, 0, false, game, 1
+        )
+    end)
+
+    -- VirtualUser
+    pcall(function()
+        if _G.FastAttack then
+            local VU = game:GetService("VirtualUser")
+
+            VU:CaptureController()
+            VU:Button1Down(
+                Vector2.new(1280, 672)
+            )
+        end
+    end)
+end
+-------------------------------------------------
+-- UI
+-------------------------------------------------
+Window:DrawCategory({ Name = "Farm" })
+
+local FarmTab = Window:DrawTab({
+    Name = "Main",
+    Icon = "swords",
+    Type = "Single",
+    EnableScrolling = true,
+})
+
+local Sec = FarmTab:DrawSection({ Name = "Combat" })
+
+local Weapon = { "None" }
+pcall(function()
+    local bag = LP:FindFirstChild("Backpack")
+    if bag then
+        for _, v in ipairs(bag:GetChildren()) do
+            if v:IsA("Tool") then table.insert(Weapon, v.Name) end
+        end
+    end
+end)
+
+Sec:AddDropdown({
+    Name = "Select Weapon",
+    Flag = "SelectWeapon",
+    Default = "None",
+    Values = Weapon,
+    Callback = function(v) State.SelectWeapon = v end,
+})
+
+Sec:AddToggle({
+    Name = "Auto Equip",
+    Flag = "AutoEquip",
+    Default = false,
+    Callback = function(v) State.AutoEquip = v and true or false end,
+})
+
+local MobList = {}
+for _, q in ipairs(QuestData) do
+    local dupe = false
+    for _, n in ipairs(MobList) do
+        if n == q.mon then dupe = true break end
+    end
+    if not dupe then table.insert(MobList, q.mon) end
+end
+if #MobList == 0 then MobList = { "None" } end
+State.SelectMon = MobList[1]
+
+Sec:AddDropdown({
+    Name = "Select Mob",
+    Flag = "SelectMon",
+    Default = MobList[1],
+    Values = MobList,
+    Callback = function(v) State.SelectMon = v end,
+})
+
+Sec:AddToggle({
+    Name = "Auto Farm Level",
+    Flag = "AutoFarmLevel",
+    Default = false,
+    Callback = function(v) State.AutoFarmLevel = v and true or false end,
+})
+
+Sec:AddToggle({
+    Name = "Auto Farm Mon",
+    Flag = "AutoFarmMon",
+    Default = false,
+    Callback = function(v) State.AutoFarmMon = v and true or false end,
+})
+
+Sec:AddParagraph({
+    Title = "DK Farm",
+    Content = "Sea1+2+3 · H5.5 · Hitbox 200\nLeftAlt = UI · Hold weapon",
+})
+
+Window:DrawCategory({ Name = "System" })
+
+local SetTab = Window:DrawTab({
+    Name = "Settings",
+    Icon = "settings-3",
+    Type = "Single",
+    EnableScrolling = true,
+})
+
+SetTab:DrawSection({ Name = "UI" }):AddToggle({
+    Name = "Always Show Frame",
+    Flag = "AlwaysShow",
+    Default = false,
+    Callback = function(v) Window.AlwayShowTab = v end,
+})
+
+pcall(function()
+    local cfg = Window:DrawConfig({
+        Name = "Config",
+        Icon = "folder",
+        Config = ConfigManager,
+    })
+    cfg:Init()
+end)
+
+-------------------------------------------------
+-- LOOPS
+-------------------------------------------------
+task.spawn(function()
+    while true do
+        task.wait(0.35)
+        if State.AutoEquip then EquipTool(State.SelectWeapon) end
+    end
+end)
+
+RunService.Stepped:Connect(function()
+    if not (State.AutoFarmLevel or State.AutoFarmMon) then return end
+    pcall(function()
+        local c = Char()
+        if not c then return end
+        for _, p in ipairs(c:GetDescendants()) do
+            if p:IsA("BasePart") then p.CanCollide = false end
+        end
+    end)
+end)
+
+task.spawn(function()
+    local was = false
+    while true do
+        task.wait(0.3)
+        local now = State.AutoFarmLevel or State.AutoFarmMon
+        if was and not now then
+            pcall(function()
+                local hum = Hum()
+                if hum then
+                    hum.AutoRotate = true
+                    hum.WalkSpeed = 16
+                    hum.JumpPower = 50
+                end
+            end)
+        end
+        was = now
+    end
+end)
+
+RunService.Heartbeat:Connect(function(dt)
+    if not (State.AutoFarmLevel or State.AutoFarmMon) then return end
+    pcall(function()
+        local name = nil
+        if State.AutoFarmLevel then
+            CheckQuest()
+            name = Current and Current.mon
+        elseif State.AutoFarmMon then
+            name = State.SelectMon
+        end
+        if not name then return end
+        local mob = FindMob(name)
+        if mob then FloatTo(mob, dt) end
+    end)
+end)
+
+task.spawn(function()
+    while true do
+        task.wait(FARM_SPEED)
+        if not State.AutoFarmLevel then
+            task.wait(0.12)
+        else
+            pcall(function()
+                CheckQuest()
+                if not Current then return end
+                if not HasQuest() then
+                    TakeQuest()
+                    task.wait(0.45)
+                    return
+                end
+                if FindMob(Current.mon) then DoM1() end
+            end)
+        end
+    end
+end)
+
+task.spawn(function()
+    while true do
+        task.wait(FARM_SPEED)
+        if not State.AutoFarmMon then
+            task.wait(0.12)
+        else
+            pcall(function()
+                local name = State.SelectMon
+                if name and FindMob(name) then DoM1() end
+            end)
+        end
+    end
+end)
+
+RunService.RenderStepped:Connect(function()
+    if not (State.AutoFarmLevel or State.AutoFarmMon) then return end
+    NoShake()
+    pcall(function()
+        if not AC then LoadCombat() end
+        local c = AC and AC.activeController
+        if c then
+            c.timeToNextAttack = 0
+            c.hitboxMagnitude = HITBOX
+            c.attacking = false
+        end
+    end)
+end)
+
+task.spawn(function()
+    while true do
+        task.wait(55)
+        pcall(function()
+            local VU = game:GetService("VirtualUser")
+            VU:CaptureController()
+            VU:ClickButton2(Vector2.new())
+        end)
+    end
+end)
+
+Notifier.new({
+    Title = "DK",
+    Content = "Sea1+2+3 · LeftAlt · Hold weapon",
+    Duration = 6,
+    Icon = DKLogo,
+})
+
+print("[DK] Full Sea1+2+3 Farm ready")

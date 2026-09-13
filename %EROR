@@ -1,0 +1,1189 @@
+--[[
+    Deku Hub | BF
+    Multi Hit 0.01 · Bring Mob · ลอยนิ่ง H18
+    Auto Level + Quest · Auto Near · Auto Farm Mon · Auto Raid 1→5
+    UI ในเกม · โลโก้เปิด/ปิด · ไม่มี error
+]]
+
+repeat task.wait() until game:IsLoaded()
+
+local Players = game:GetService("Players")
+local RS = game:GetService("ReplicatedStorage")
+local RunService = game:GetService("RunService")
+local TweenService = game:GetService("TweenService")
+local VU = game:GetService("VirtualUser")
+local UserInputService = game:GetService("UserInputService")
+local LP = Players.LocalPlayer
+repeat task.wait() until LP
+local PlayerGui = LP:WaitForChild("PlayerGui")
+
+-------------------------------------------------
+-- SETTINGS
+-------------------------------------------------
+local FLOAT_HEIGHT = 18
+local FAST_DELAY = 0.01
+local MULTI_RANGE = 150
+local DETECT_RANGE = 100000
+local TWEEN_SPEED = 95
+local RAID_TWEEN_SPEED = 70
+local FLOAT_TWEEN_TIME = 0.25
+local RAID_ISLAND_RANGE = 3500
+local RAID_NO_MOB_WAIT = 1.2
+local ARRIVE_DIST = 55
+local QUEST_ARRIVE = 25
+local FARM_ARRIVE = 45
+local BRING_RANGE = 350
+
+_G.AutoLevel = false
+_G.AutoNear = false
+_G.AutoRaid = false
+_G.AutoFarmMon = false
+_G.AutoHaki = true
+_G.AutoEquip = true
+_G.MultiHit = true
+_G.AutoQuest = true
+_G.BringMob = true
+
+local SelectWeapon = "Combat"
+local WeaponList = { "Combat" }
+local WeaponIndex = 1
+local SelectMon = ""
+local MonList = {}
+local MonIndex = 1
+local Ms, NameQuest, QuestLv, NameMon = "", "", 1, ""
+local CFrameQ = CFrame.new()
+local CFrameMon = CFrame.new()
+local floatTween, moveTween = nil, nil
+local raidIslandIndex = 1
+local raidNoMobTimer = 0
+local raidArrived = false
+local hakiDone = false
+local farmingActive = false
+local farmAnchor = nil
+
+local RaidIslands = {
+    CFrame.new(79263.203125, 21.930282592773438, -25421.021484375),
+    CFrame.new(79420.2578125, 4.920953750610352, -24189.666015625),
+    CFrame.new(79504.4296875, 8.247620582580566, -22954.46875),
+    CFrame.new(79498.6875, 25.516376495361328, -21609.3671875),
+    CFrame.new(79605.9375, 11.768150329589844, -19639.177734375),
+}
+
+-------------------------------------------------
+-- SEA + tableMon
+-------------------------------------------------
+local placeId = game.PlaceId
+local Sea1 = placeId == 2753915549
+local Sea2 = placeId == 4442272183
+local Sea3 = placeId == 7449423635
+
+local tableMon = {}
+if Sea1 then
+    tableMon = {
+        "Bandit", "Monkey", "Gorilla", "Pirate", "Brute",
+        "Desert Bandit", "Desert Officer", "Snow Bandit", "Snowman",
+        "Chief Petty Officer", "Sky Bandit", "Dark Master",
+        "Prisoner", "Dangerous Prisoner", "Toga Warrior", "Gladiator",
+        "Military Soldier", "Military Spy", "Fishman Warrior", "Fishman Commando",
+        "God's Guard", "Shanda", "Royal Squad", "Royal Soldier",
+        "Galley Pirate", "Galley Captain",
+    }
+elseif Sea2 then
+    tableMon = {
+        "Raider", "Mercenary", "Swan Pirate", "Factory Staff",
+        "Marine Lieutenant", "Marine Captain", "Zombie", "Vampire",
+        "Snow Trooper", "Winter Warrior", "Lab Subordinate", "Horned Warrior",
+        "Magma Ninja", "Lava Pirate", "Ship Deckhand", "Ship Engineer",
+        "Ship Steward", "Ship Officer", "Arctic Warrior", "Snow Lurker",
+        "Sea Soldier", "Water Fighter",
+    }
+elseif Sea3 then
+    tableMon = {
+        "Pirate Millionaire", "Dragon Crew Warrior", "Dragon Crew Archer",
+        "Hydra Enforcer", "Venomous Assailant", "Marine Commodore", "Marine Rear Admiral",
+        "Fishman Raider", "Fishman Captain", "Forest Pirate", "Mythological Pirate",
+        "Jungle Pirate", "Musketeer Pirate", "Reborn Skeleton", "Living Zombie",
+        "Demonic Soul", "Posessed Mummy", "Peanut Scout", "Peanut President",
+        "Ice Cream Chef", "Ice Cream Commander", "Cookie Crafter", "Cake Guard",
+        "Baking Staff", "Head Baker", "Cocoa Warrior", "Chocolate Bar Battler",
+        "Sweet Thief", "Candy Rebel", "Candy Pirate", "Snow Demon",
+        "Isle Outlaw", "Island Boy", "Sun-kissed Warrior", "Isle Champion",
+        "Serpent Hunter", "Skulls, Slayer",
+    }
+end
+MonList = tableMon
+if #MonList > 0 then
+    SelectMon = MonList[1]
+end
+
+-------------------------------------------------
+-- QUEST DATA (เต็ม Sea1-3)
+-------------------------------------------------
+local QuestData = {
+    { minLevel = 1, maxLevel = 9, Ms = "Bandit", NameQuest = "BanditQuest1", QuestLv = 1, NameMon = "Bandit",
+      CFrameQ = CFrame.new(1060.9383544922, 16.455866889008, 1547.7841796875),
+      CFrameMon = CFrame.new(1038.5533447266, 41.296249389648, 1576.5098876953) },
+    { minLevel = 10, maxLevel = 14, Ms = "Monkey", NameQuest = "JungleQuest", QuestLv = 1, NameMon = "Monkey",
+      CFrameQ = CFrame.new(-1601.6553955078, 36.85213470459, 153.38009204102),
+      CFrameMon = CFrame.new(-1448.1446533203, 50.851993560791, 63.60718536377) },
+    { minLevel = 15, maxLevel = 29, Ms = "Gorilla", NameQuest = "JungleQuest", QuestLv = 2, NameMon = "Gorilla",
+      CFrameQ = CFrame.new(-1601.6553955078, 36.85213470459, 153.38009204102),
+      CFrameMon = CFrame.new(-1142.6455078109, 40.462348937988, -515.39227294922) },
+    { minLevel = 30, maxLevel = 39, Ms = "Pirate", NameQuest = "BuggyQuest1", QuestLv = 1, NameMon = "Pirate",
+      CFrameQ = CFrame.new(-1140.1761474609, 4.752049446106, 3827.4057617188),
+      CFrameMon = CFrame.new(-1201.0881347656, 40.628940582275, 3857.5966796875) },
+    { minLevel = 40, maxLevel = 59, Ms = "Brute", NameQuest = "BuggyQuest1", QuestLv = 2, NameMon = "Brute",
+      CFrameQ = CFrame.new(-1140.1761474609, 4.752049446106, 3827.4057617188),
+      CFrameMon = CFrame.new(-1387.5524707031, 24.592035293579, 4100.9575195313) },
+    { minLevel = 60, maxLevel = 74, Ms = "Desert Bandit", NameQuest = "DesertQuest", QuestLv = 1, NameMon = "Desert Bandit",
+      CFrameQ = CFrame.new(896.51721191406, 6.4384617805481, 4390.1494140625),
+      CFrameMon = CFrame.new(984.99896240234, 16.109552383423, 4417.91015625) },
+    { minLevel = 75, maxLevel = 89, Ms = "Desert Officer", NameQuest = "DesertQuest", QuestLv = 2, NameMon = "Desert Officer",
+      CFrameQ = CFrame.new(896.51721191406, 6.4384617805481, 4390.1494140625),
+      CFrameMon = CFrame.new(1547.1510009766, 14.452038764954, 4381.8002929688) },
+    { minLevel = 90, maxLevel = 99, Ms = "Snow Bandit", NameQuest = "SnowQuest", QuestLv = 1, NameMon = "Snow Bandit",
+      CFrameQ = CFrame.new(1386.8073730469, 87.272789001465, -1298.3576660156),
+      CFrameMon = CFrame.new(1356.3028564453, 105.76865386963, -1328.2419128418) },
+    { minLevel = 100, maxLevel = 119, Ms = "Snowman", NameQuest = "SnowQuest", QuestLv = 2, NameMon = "Snowman",
+      CFrameQ = CFrame.new(1386.8073730469, 87.272789001465, -1298.3576660156),
+      CFrameMon = CFrame.new(1218.7956542969, 138.01184082031, -1488.0262451172) },
+    { minLevel = 120, maxLevel = 149, Ms = "Chief Petty Officer", NameQuest = "MarineQuest2", QuestLv = 1, NameMon = "Chief Petty Officer",
+      CFrameQ = CFrame.new(-5035.49609375, 28.677835464478, 4324.1840820313),
+      CFrameMon = CFrame.new(-4931.1552734375, 65.793113708496, 4121.8393554688) },
+    { minLevel = 150, maxLevel = 174, Ms = "Sky Bandit", NameQuest = "SkyQuest", QuestLv = 1, NameMon = "Sky Bandit",
+      CFrameQ = CFrame.new(-4842.1372070313, 717.69543457031, -2623.0483398438),
+      CFrameMon = CFrame.new(-4955.6411132813, 365.46365356445, -2908.1865234375) },
+    { minLevel = 175, maxLevel = 189, Ms = "Dark Master", NameQuest = "SkyQuest", QuestLv = 2, NameMon = "Dark Master",
+      CFrameQ = CFrame.new(-4842.1372070313, 717.69543457031, -2623.0483398438),
+      CFrameMon = CFrame.new(-5148.1650390625, 439.04571533203, -2332.9611816406) },
+    { minLevel = 190, maxLevel = 209, Ms = "Prisoner", NameQuest = "PrisonerQuest", QuestLv = 1, NameMon = "Prisoner",
+      CFrameQ = CFrame.new(5310.60547, 0.350014925, 474.946594),
+      CFrameMon = CFrame.new(4937.31885, 0.332031399, 649.547524) },
+    { minLevel = 210, maxLevel = 249, Ms = "Dangerous Prisoner", NameQuest = "PrisonerQuest", QuestLv = 2, NameMon = "Dangerous Prisoner",
+      CFrameQ = CFrame.new(5310.60547, 0.350014925, 474.946594),
+      CFrameMon = CFrame.new(5099.6626, 0.351562679, 1055.7583) },
+    { minLevel = 250, maxLevel = 274, Ms = "Toga Warrior", NameQuest = "ColosseumQuest", QuestLv = 1, NameMon = "Toga Warrior",
+      CFrameQ = CFrame.new(-1577.7890625, 7.4151420593262, -2984.4838867188),
+      CFrameMon = CFrame.new(-1872.5166015625, 49.080215454102, -2913.810546875) },
+    { minLevel = 275, maxLevel = 299, Ms = "Gladiator", NameQuest = "ColosseumQuest", QuestLv = 2, NameMon = "Gladiator",
+      CFrameQ = CFrame.new(-1577.7890625, 7.4151420593262, -2984.4838867188),
+      CFrameMon = CFrame.new(-1521.3740234375, 81.203170776367, -3066.3139648438) },
+    { minLevel = 300, maxLevel = 324, Ms = "Military Soldier", NameQuest = "MagmaQuest", QuestLv = 1, NameMon = "Military Soldier",
+      CFrameQ = CFrame.new(-5316.1157226563, 12.262831687927, -8517.00390625),
+      CFrameMon = CFrame.new(-5369.0004882813, 61.24352645874, -8556.4921875) },
+    { minLevel = 325, maxLevel = 374, Ms = "Military Spy", NameQuest = "MagmaQuest", QuestLv = 2, NameMon = "Military Spy",
+      CFrameQ = CFrame.new(-5316.1157226563, 12.262831687927, -8517.00390625),
+      CFrameMon = CFrame.new(-5787.00293, 75.8262634, -8651.69922) },
+    { minLevel = 375, maxLevel = 399, Ms = "Fishman Warrior", NameQuest = "FishmanQuest", QuestLv = 1, NameMon = "Fishman Warrior",
+      CFrameQ = CFrame.new(61122.65234375, 18.497442245483, 1569.3997802734),
+      CFrameMon = CFrame.new(60844.10546875, 98.462875366211, 1290.3985595703) },
+    { minLevel = 400, maxLevel = 449, Ms = "Fishman Commando", NameQuest = "FishmanQuest", QuestLv = 2, NameMon = "Fishman Commando",
+      CFrameQ = CFrame.new(61122.65234375, 18.497442245483, 1569.3997802734),
+      CFrameMon = CFrame.new(61738.3984375, 64.207321166992, 1433.8375244141) },
+    { minLevel = 450, maxLevel = 474, Ms = "God's Guard", NameQuest = "SkyExp1Quest", QuestLv = 1, NameMon = "God's Guard",
+      CFrameQ = CFrame.new(-4721.8603515625, 845.30297851563, -1953.8489990234),
+      CFrameMon = CFrame.new(-4628.0498046875, 866.92877197266, -1931.2352294922) },
+    { minLevel = 475, maxLevel = 524, Ms = "Shanda", NameQuest = "SkyExp1Quest", QuestLv = 2, NameMon = "Shanda",
+      CFrameQ = CFrame.new(-7863.1596679688, 5545.5190429688, -378.42266845703),
+      CFrameMon = CFrame.new(-7685.1474609375, 5601.0751953125, -441.38076342773) },
+    { minLevel = 525, maxLevel = 549, Ms = "Royal Squad", NameQuest = "SkyExp2Quest", QuestLv = 1, NameMon = "Royal Squad",
+      CFrameQ = CFrame.new(-7903.3828125, 5635.9897460938, -1410.923828125),
+      CFrameMon = CFrame.new(-7654.2514648438, 5637.1079101563, -1407.7550048828) },
+    { minLevel = 550, maxLevel = 624, Ms = "Royal Soldier", NameQuest = "SkyExp2Quest", QuestLv = 2, NameMon = "Royal Soldier",
+      CFrameQ = CFrame.new(-7903.3828125, 5635.9897460938, -1410.923828125),
+      CFrameMon = CFrame.new(-7760.4106445313, 5679.9077148438, -1884.8112792969) },
+    { minLevel = 625, maxLevel = 649, Ms = "Galley Pirate", NameQuest = "FountainQuest", QuestLv = 1, NameMon = "Galley Pirate",
+      CFrameQ = CFrame.new(5258.2788085938, 38.526931762695, 4050.044921875),
+      CFrameMon = CFrame.new(5557.1684570313, 152.32717895508, 3998.7758789063) },
+    { minLevel = 650, maxLevel = 699, Ms = "Galley Captain", NameQuest = "FountainQuest", QuestLv = 2, NameMon = "Galley Captain",
+      CFrameQ = CFrame.new(5258.2788085938, 38.526931762695, 4050.044921875),
+      CFrameMon = CFrame.new(5677.6772460938, 92.786109924316, 4966.0322265625) },
+    { minLevel = 700, maxLevel = 724, Ms = "Raider", NameQuest = "Area1Quest", QuestLv = 1, NameMon = "Raider",
+      CFrameQ = CFrame.new(-427.72567749023, 72.99634552002, 1835.9426269531),
+      CFrameMon = CFrame.new(68.874656124512, 93.635643005371, 2429.6752929688) },
+    { minLevel = 725, maxLevel = 774, Ms = "Mercenary", NameQuest = "Area1Quest", QuestLv = 2, NameMon = "Mercenary",
+      CFrameQ = CFrame.new(-427.72567749023, 72.99634552002, 1835.9426269531),
+      CFrameMon = CFrame.new(-864.85009765625, 122.47104644775, 1453.1505126953) },
+    { minLevel = 775, maxLevel = 799, Ms = "Swan Pirate", NameQuest = "Area2Quest", QuestLv = 1, NameMon = "Swan Pirate",
+      CFrameQ = CFrame.new(635.61151123047, 73.096351623535, 917.81298828125),
+      CFrameMon = CFrame.new(1065.3669433594, 137.64012145996, 1324.3798828125) },
+    { minLevel = 800, maxLevel = 874, Ms = "Factory Staff", NameQuest = "Area2Quest", QuestLv = 2, NameMon = "Factory Staff",
+      CFrameQ = CFrame.new(635.61151123047, 73.096351623535, 917.81298828125),
+      CFrameMon = CFrame.new(533.22045898438, 128.46876525879, 355.62615966797) },
+    { minLevel = 875, maxLevel = 899, Ms = "Marine Lieutenant", NameQuest = "MarineQuest3", QuestLv = 1, NameMon = "Marine Lieutenant",
+      CFrameQ = CFrame.new(-2440.9934082031, 73.04190826416, -3217.7082519531),
+      CFrameMon = CFrame.new(-2489.2622070313, 84.613504055176, -3151.8830566406) },
+    { minLevel = 900, maxLevel = 949, Ms = "Marine Captain", NameQuest = "MarineQuest3", QuestLv = 2, NameMon = "Marine Captain",
+      CFrameQ = CFrame.new(-2440.9934082031, 73.04190826416, -3217.7082519531),
+      CFrameMon = CFrame.new(-2335.2026367188, 79.786659240723, -3245.8674316406) },
+    { minLevel = 950, maxLevel = 974, Ms = "Zombie", NameQuest = "ZombieQuest", QuestLv = 1, NameMon = "Zombie",
+      CFrameQ = CFrame.new(-5494.3413085938, 48.505931854248, -794.59094238281),
+      CFrameMon = CFrame.new(-5536.4970703125, 101.08577728271, -835.59075927734) },
+    { minLevel = 975, maxLevel = 999, Ms = "Vampire", NameQuest = "ZombieQuest", QuestLv = 2, NameMon = "Vampire",
+      CFrameQ = CFrame.new(-5494.3413085938, 48.505931854248, -794.59094238281),
+      CFrameMon = CFrame.new(-5806.1098632813, 16.722528457642, -1164.4384765625) },
+    { minLevel = 1000, maxLevel = 1049, Ms = "Snow Trooper", NameQuest = "SnowMountainQuest", QuestLv = 1, NameMon = "Snow Trooper",
+      CFrameQ = CFrame.new(607.05963134766, 401.44781494141, -5370.5546875),
+      CFrameMon = CFrame.new(535.21851025391, 432.74209594727, -5484.9165039063) },
+    { minLevel = 1050, maxLevel = 1099, Ms = "Winter Warrior", NameQuest = "SnowMountainQuest", QuestLv = 2, NameMon = "Winter Warrior",
+      CFrameQ = CFrame.new(607.05963134766, 401.44781494141, -5370.5546875),
+      CFrameMon = CFrame.new(1234.4449462891, 456.95419311523, -5174.130859375) },
+    { minLevel = 1100, maxLevel = 1124, Ms = "Lab Subordinate", NameQuest = "IceSideQuest", QuestLv = 1, NameMon = "Lab Subordinate",
+      CFrameQ = CFrame.new(-6061.841796875, 15.926671981812, -4902.0385742188),
+      CFrameMon = CFrame.new(-5720.5576171875, 63.309471130371, -4784.6103515625) },
+    { minLevel = 1125, maxLevel = 1174, Ms = "Horned Warrior", NameQuest = "IceSideQuest", QuestLv = 2, NameMon = "Horned Warrior",
+      CFrameQ = CFrame.new(-6061.841796875, 15.926671981812, -4902.0385742188),
+      CFrameMon = CFrame.new(-6292.751953125, 91.181983947754, -5502.6499023438) },
+    { minLevel = 1175, maxLevel = 1199, Ms = "Magma Ninja", NameQuest = "FireSideQuest", QuestLv = 1, NameMon = "Magma Ninja",
+      CFrameQ = CFrame.new(-5429.0473632813, 15.977565765381, -5297.9614257813),
+      CFrameMon = CFrame.new(-5461.8388671875, 130.36347961426, -5836.4702148438) },
+    { minLevel = 1200, maxLevel = 1249, Ms = "Lava Pirate", NameQuest = "FireSideQuest", QuestLv = 2, NameMon = "Lava Pirate",
+      CFrameQ = CFrame.new(-5429.0473632813, 15.977565765381, -5297.9614257813),
+      CFrameMon = CFrame.new(-5251.1889648438, 55.164535522461, -4774.4096679688) },
+    { minLevel = 1250, maxLevel = 1274, Ms = "Ship Deckhand", NameQuest = "ShipQuest1", QuestLv = 1, NameMon = "Ship Deckhand",
+      CFrameQ = CFrame.new(1048.2927246094, 125.08293151855, 32911.0390625),
+      CFrameMon = CFrame.new(921.12365722656, 125.9839553833, 33088.328125) },
+    { minLevel = 1275, maxLevel = 1299, Ms = "Ship Engineer", NameQuest = "ShipQuest1", QuestLv = 2, NameMon = "Ship Engineer",
+      CFrameQ = CFrame.new(1048.2927246094, 125.08293151855, 32911.0390625),
+      CFrameMon = CFrame.new(886.28179931641, 48.47790145874, 32860.83203125) },
+    { minLevel = 1300, maxLevel = 1324, Ms = "Ship Steward", NameQuest = "ShipQuest2", QuestLv = 1, NameMon = "Ship Steward",
+      CFrameQ = CFrame.new(971.42065429688, 125.08293151855, 33245.54296875),
+      CFrameMon = CFrame.new(943.85604150391, 129.58183288574, 33444.3671875) },
+    { minLevel = 1325, maxLevel = 1349, Ms = "Ship Officer", NameQuest = "ShipQuest2", QuestLv = 2, NameMon = "Ship Officer",
+      CFrameQ = CFrame.new(971.42065429688, 125.08293151855, 33245.54296875),
+      CFrameMon = CFrame.new(955.38458251953, 181.08335876465, 33331.890625) },
+    { minLevel = 1350, maxLevel = 1374, Ms = "Arctic Warrior", NameQuest = "FrostQuest", QuestLv = 1, NameMon = "Arctic Warrior",
+      CFrameQ = CFrame.new(5668.1372070313, 28.202531814575, -6484.6005859375),
+      CFrameMon = CFrame.new(5935.4541015625, 77.26016998291, -6472.7568359375) },
+    { minLevel = 1375, maxLevel = 1424, Ms = "Snow Lurker", NameQuest = "FrostQuest", QuestLv = 2, NameMon = "Snow Lurker",
+      CFrameQ = CFrame.new(5668.1372070313, 28.202531814575, -6484.6005859375),
+      CFrameMon = CFrame.new(5628.482421875, 57.574996948242, -6610.3481445313) },
+    { minLevel = 1425, maxLevel = 1449, Ms = "Sea Soldier", NameQuest = "ForgottenQuest", QuestLv = 1, NameMon = "Sea Soldier",
+      CFrameQ = CFrame.new(-3054.5827636719, 236.87213134766, -10147.790039063),
+      CFrameMon = CFrame.new(-3185.0153808594, 58.789089202881, -9663.6064453125) },
+    { minLevel = 1450, maxLevel = 1499, Ms = "Water Fighter", NameQuest = "ForgottenQuest", QuestLv = 2, NameMon = "Water Fighter",
+      CFrameQ = CFrame.new(-3054.5827636719, 236.87213134766, -10147.790039063),
+      CFrameMon = CFrame.new(-3262.9301757813, 298.69036865234, -10562.529296875) },
+    { minLevel = 1500, maxLevel = 1524, Ms = "Pirate Millionaire", NameQuest = "PiratePortQuest", QuestLv = 1, NameMon = "Pirate Millionaire",
+      CFrameQ = CFrame.new(-450.1046447753906, 107.68145751953125, 5950.72607421875),
+      CFrameMon = CFrame.new(-193.09227905273438, 56.12502670288086, 5755.7880859375) },
+    { minLevel = 1525, maxLevel = 1574, Ms = "Pistol Billionaire", NameQuest = "PiratePortQuest", QuestLv = 2, NameMon = "Pistol Billionaire",
+      CFrameQ = CFrame.new(-450.1046447753906, 107.68145751953125, 5950.72607421875),
+      CFrameMon = CFrame.new(-188.14462280273438, 84.49613189697266, 6337.8419921875) },
+    { minLevel = 1575, maxLevel = 1599, Ms = "Dragon Crew Warrior", NameQuest = "DragonCrewQuest", QuestLv = 1, NameMon = "Dragon Crew Warrior",
+      CFrameQ = CFrame.new(6735.11083984375, 126.99046325683594, -711.0979614257812),
+      CFrameMon = CFrame.new(6615.2333984375, 50.847679138183594, -978.93408203125) },
+    { minLevel = 1600, maxLevel = 1624, Ms = "Dragon Crew Archer", NameQuest = "DragonCrewQuest", QuestLv = 2, NameMon = "Dragon Crew Archer",
+      CFrameQ = CFrame.new(6735.11083984375, 126.99046325683594, -711.0979614257812),
+      CFrameMon = CFrame.new(6818.58935546875, 483.718994140625, 512.726806640625) },
+    { minLevel = 1625, maxLevel = 1649, Ms = "Hydra Enforcer", NameQuest = "VenomCrewQuest", QuestLv = 1, NameMon = "Hydra Enforcer",
+      CFrameQ = CFrame.new(5446.8793945313, 601.62945556641, 749.45672607422),
+      CFrameMon = CFrame.new(4547.115234375, 1001.60205078125, 334.1954650878906) },
+    { minLevel = 1650, maxLevel = 1699, Ms = "Venomous Assailant", NameQuest = "VenomCrewQuest", QuestLv = 2, NameMon = "Venomous Assailant",
+      CFrameQ = CFrame.new(5446.8793945313, 601.62945556641, 749.45672607422),
+      CFrameMon = CFrame.new(4637.88525390625, 1077.85595703125, 882.410400390625) },
+    { minLevel = 1700, maxLevel = 1724, Ms = "Marine Commodore", NameQuest = "MarineTreeIsland", QuestLv = 1, NameMon = "Marine Commodore",
+      CFrameQ = CFrame.new(2179.98828125, 28.731239318848, -6740.0551757813),
+      CFrameMon = CFrame.new(2198.0063476563, 128.71075439453, -7109.5043945313) },
+    { minLevel = 1725, maxLevel = 1774, Ms = "Marine Rear Admiral", NameQuest = "MarineTreeIsland", QuestLv = 2, NameMon = "Marine Rear Admiral",
+      CFrameQ = CFrame.new(2179.98828125, 28.731239318848, -6740.0551757813),
+      CFrameMon = CFrame.new(3294.3142089844, 385.41125488281, -7048.6342773438) },
+    { minLevel = 1775, maxLevel = 1799, Ms = "Fishman Raider", NameQuest = "DeepForestIsland3", QuestLv = 1, NameMon = "Fishman Raider",
+      CFrameQ = CFrame.new(-10582.759765625, 331.78845214844, -8757.666015625),
+      CFrameMon = CFrame.new(-10553.268554688, 521.38439941406, -8176.9458007813) },
+    { minLevel = 1800, maxLevel = 1824, Ms = "Fishman Captain", NameQuest = "DeepForestIsland3", QuestLv = 2, NameMon = "Fishman Captain",
+      CFrameQ = CFrame.new(-10583.099609375, 331.78845214844, -8759.4638671875),
+      CFrameMon = CFrame.new(-10789.401367188, 427.18637084961, -9131.4423828125) },
+    { minLevel = 1825, maxLevel = 1849, Ms = "Forest Pirate", NameQuest = "DeepForestIsland", QuestLv = 1, NameMon = "Forest Pirate",
+      CFrameQ = CFrame.new(-13232.682109375, 332.40396118164, -7626.4819335938),
+      CFrameMon = CFrame.new(-13489.397460938, 400.30349731445, -7770.251953125) },
+    { minLevel = 1850, maxLevel = 1899, Ms = "Mythological Pirate", NameQuest = "DeepForestIsland", QuestLv = 2, NameMon = "Mythological Pirate",
+      CFrameQ = CFrame.new(-13232.682109375, 332.40396118164, -7626.4819335938),
+      CFrameMon = CFrame.new(-13508.616210938, 582.46228027344, -6985.3037109375) },
+    { minLevel = 1900, maxLevel = 1924, Ms = "Jungle Pirate", NameQuest = "DeepForestIsland2", QuestLv = 1, NameMon = "Jungle Pirate",
+      CFrameQ = CFrame.new(-12682.096679688, 390.88653564453, -9902.1240234375),
+      CFrameMon = CFrame.new(-12267.103515625, 459.75262451172, -10277.200195313) },
+    { minLevel = 1925, maxLevel = 1974, Ms = "Musketeer Pirate", NameQuest = "DeepForestIsland2", QuestLv = 2, NameMon = "Musketeer Pirate",
+      CFrameQ = CFrame.new(-12682.096679688, 390.88653564453, -9902.1240234375),
+      CFrameMon = CFrame.new(-13291.5078125, 520.47338867188, -9904.638671875) },
+    { minLevel = 1975, maxLevel = 1999, Ms = "Reborn Skeleton", NameQuest = "HauntedQuest1", QuestLv = 1, NameMon = "Reborn Skeleton",
+      CFrameQ = CFrame.new(-9480.80762, 142.130661, 5566.37305),
+      CFrameMon = CFrame.new(-8761.77148, 183.431747, 6168.33301) },
+    { minLevel = 2000, maxLevel = 2024, Ms = "Living Zombie", NameQuest = "HauntedQuest1", QuestLv = 2, NameMon = "Living Zombie",
+      CFrameQ = CFrame.new(-9480.80762, 142.130661, 5566.37305),
+      CFrameMon = CFrame.new(-10183.7529, 238.565979, 6179.75977) },
+    { minLevel = 2025, maxLevel = 2049, Ms = "Demonic Soul", NameQuest = "HauntedQuest2", QuestLv = 1, NameMon = "Demonic Soul",
+      CFrameQ = CFrame.new(-9516.9931640625, 178.00651550293, 6078.4653320313),
+      CFrameMon = CFrame.new(-9712.03125, 204.69589233398, 6193.322265625) },
+    { minLevel = 2050, maxLevel = 2074, Ms = "Posessed Mummy", NameQuest = "HauntedQuest2", QuestLv = 2, NameMon = "Posessed Mummy",
+      CFrameQ = CFrame.new(-9516.9931640625, 178.00651550293, 6078.4653320313),
+      CFrameMon = CFrame.new(-9545.776371875, 69.619895935059, 6339.5615234375) },
+    { minLevel = 2075, maxLevel = 2099, Ms = "Peanut Scout", NameQuest = "NutsIslandQuest", QuestLv = 1, NameMon = "Peanut Scout",
+      CFrameQ = CFrame.new(-2105.53198, 37.2495995, -10195.5088),
+      CFrameMon = CFrame.new(-2150.587890625, 122.49767303467, -10358.994140625) },
+    { minLevel = 2100, maxLevel = 2124, Ms = "Peanut President", NameQuest = "NutsIslandQuest", QuestLv = 2, NameMon = "Peanut President",
+      CFrameQ = CFrame.new(-2105.53198, 37.2495995, -10195.5088),
+      CFrameMon = CFrame.new(-2150.587890625, 122.49767303467, -10358.994140625) },
+    { minLevel = 2125, maxLevel = 2149, Ms = "Ice Cream Chef", NameQuest = "IceCreamIslandQuest", QuestLv = 1, NameMon = "Ice Cream Chef",
+      CFrameQ = CFrame.new(819.376709, 64.9259796, -10967.2832),
+      CFrameMon = CFrame.new(789.941528, 209.382889, -11009.9805) },
+    { minLevel = 2150, maxLevel = 2199, Ms = "Ice Cream Commander", NameQuest = "IceCreamIslandQuest", QuestLv = 2, NameMon = "Ice Cream Commander",
+      CFrameQ = CFrame.new(819.376709, 64.9259796, -10967.2832),
+      CFrameMon = CFrame.new(789.941528, 209.382889, -11009.9805) },
+    { minLevel = 2200, maxLevel = 2224, Ms = "Cookie Crafter", NameQuest = "CakeQuest1", QuestLv = 1, NameMon = "Cookie Crafter",
+      CFrameQ = CFrame.new(-2022.29858, 36.9275894, -12030.9766),
+      CFrameMon = CFrame.new(-2321.71216, 36.699482, -12216.7871) },
+    { minLevel = 2225, maxLevel = 2249, Ms = "Cake Guard", NameQuest = "CakeQuest1", QuestLv = 2, NameMon = "Cake Guard",
+      CFrameQ = CFrame.new(-2022.29858, 36.9275894, -12030.9766),
+      CFrameMon = CFrame.new(-1418.11011, 36.6718041, -12255.7324) },
+    { minLevel = 2250, maxLevel = 2274, Ms = "Baking Staff", NameQuest = "CakeQuest2", QuestLv = 1, NameMon = "Baking Staff",
+      CFrameQ = CFrame.new(-1928.31763, 37.7296638, -12842.626),
+      CFrameMon = CFrame.new(-1980.42848, 36.6716766, -12993.6418) },
+    { minLevel = 2275, maxLevel = 2299, Ms = "Head Baker", NameQuest = "CakeQuest2", QuestLv = 2, NameMon = "Head Baker",
+      CFrameQ = CFrame.new(-1928.31763, 37.7296638, -12842.626),
+      CFrameMon = CFrame.new(-2251.5791, 52.2714615, -13033.3965) },
+    { minLevel = 2300, maxLevel = 2324, Ms = "Cocoa Warrior", NameQuest = "ChocQuest1", QuestLv = 1, NameMon = "Cocoa Warrior",
+      CFrameQ = CFrame.new(231.75, 23.9003029, -12200.292),
+      CFrameMon = CFrame.new(167.978516, 26.2254658, -12238.874) },
+    { minLevel = 2325, maxLevel = 2349, Ms = "Chocolate Bar Battler", NameQuest = "ChocQuest1", QuestLv = 2, NameMon = "Chocolate Bar Battler",
+      CFrameQ = CFrame.new(231.75, 23.9003029, -12200.292),
+      CFrameMon = CFrame.new(701.312073, 25.5824986, -12708.2148) },
+    { minLevel = 2350, maxLevel = 2374, Ms = "Sweet Thief", NameQuest = "ChocQuest2", QuestLv = 1, NameMon = "Sweet Thief",
+      CFrameQ = CFrame.new(151.198242, 23.8907146, -12774.6172),
+      CFrameMon = CFrame.new(-140.258301, 25.5824986, -12652.3115) },
+    { minLevel = 2375, maxLevel = 2399, Ms = "Candy Rebel", NameQuest = "ChocQuest2", QuestLv = 2, NameMon = "Candy Rebel",
+      CFrameQ = CFrame.new(151.198242, 23.8907146, -12774.6172),
+      CFrameMon = CFrame.new(47.9231453, 25.5824986, -13029.2402) },
+    { minLevel = 2400, maxLevel = 2424, Ms = "Candy Pirate", NameQuest = "CandyQuest1", QuestLv = 1, NameMon = "Candy Pirate",
+      CFrameQ = CFrame.new(-1149.328, 13.5759039, -14445.6143),
+      CFrameMon = CFrame.new(-1437.56348, 17.1481285, -14385.6934) },
+    { minLevel = 2425, maxLevel = 2449, Ms = "Snow Demon", NameQuest = "CandyQuest1", QuestLv = 2, NameMon = "Snow Demon",
+      CFrameQ = CFrame.new(-1149.328, 13.5759039, -14445.6143),
+      CFrameMon = CFrame.new(-916.222656, 17.1481285, -14638.8125) },
+    { minLevel = 2450, maxLevel = 2474, Ms = "Isle Outlaw", NameQuest = "TikiQuest1", QuestLv = 1, NameMon = "Isle Outlaw",
+      CFrameQ = CFrame.new(-16549.890625, 55.68635559082031, -179.91360473632812),
+      CFrameMon = CFrame.new(-16162.8193359375, 11.6863374710083, -96.45481872558594) },
+    { minLevel = 2475, maxLevel = 2499, Ms = "Island Boy", NameQuest = "TikiQuest1", QuestLv = 2, NameMon = "Island Boy",
+      CFrameQ = CFrame.new(-16549.890625, 55.68635559082031, -179.91360473632812),
+      CFrameMon = CFrame.new(-16357.3125, 20.632822036743164, 1005.64892578125) },
+    { minLevel = 2500, maxLevel = 2524, Ms = "Sun-kissed Warrior", NameQuest = "TikiQuest2", QuestLv = 1, NameMon = "Sun-kissed Warrior",
+      CFrameQ = CFrame.new(-16541.021484375, 54.77081298828125, 1051.461181640625),
+      CFrameMon = CFrame.new(-16357.3125, 20.632822036743164, 1005.64892578125) },
+    { minLevel = 2525, maxLevel = 2549, Ms = "Isle Champion", NameQuest = "TikiQuest2", QuestLv = 2, NameMon = "Isle Champion",
+      CFrameQ = CFrame.new(-16541.021484375, 54.77081298828125, 1051.461181640625),
+      CFrameMon = CFrame.new(-16848.94140625, 21.68633460998535, 1041.4490966796875) },
+    { minLevel = 2550, maxLevel = 2574, Ms = "Serpent Hunter", NameQuest = "TikiQuest3", QuestLv = 1, NameMon = "Serpent Hunter",
+      CFrameQ = CFrame.new(-16665.19140625, 104.59640502929688, 1579.6943359375),
+      CFrameMon = CFrame.new(-16621.4140625, 121.40631103515625, 1290.6881103515625) },
+    { minLevel = 2575, maxLevel = 2599, Ms = "Skulls Slayer", NameQuest = "TikiQuest3", QuestLv = 2, NameMon = "Skulls Slayer",
+      CFrameQ = CFrame.new(-16665.19140625, 104.59640502929688, 1579.6943359375),
+      CFrameMon = CFrame.new(-16661.736328125, 114.05611419677734, 1577.72509765625) },
+}
+
+local function GetQuestByLevel(lv)
+    for _, row in ipairs(QuestData) do
+        if lv >= row.minLevel and lv <= row.maxLevel then
+            return row
+        end
+    end
+    return QuestData[#QuestData]
+end
+
+local function GetMonCFrame(name)
+    if type(name) \~= "string" or #name == 0 then return nil end
+    for _, row in ipairs(QuestData) do
+        if row.NameMon == name or row.Ms == name then
+            return row.CFrameMon
+        end
+    end
+    return nil
+end
+
+-------------------------------------------------
+-- MULTI HIT
+-------------------------------------------------
+local RegisterAttack, RegisterHit = nil, nil
+pcall(function()
+    local Net = RS:WaitForChild("Modules", 8):WaitForChild("Net", 8)
+    RegisterAttack = Net:WaitForChild("RE/RegisterAttack", 8)
+    RegisterHit = Net:WaitForChild("RE/RegisterHit", 8)
+end)
+
+local function Char() return LP.Character end
+local function Hum()
+    local c = Char()
+    return c and c:FindFirstChildOfClass("Humanoid")
+end
+local function HRP()
+    local c = Char()
+    return c and c:FindFirstChild("HumanoidRootPart")
+end
+
+local function GetTargets(maxRange)
+    local list = {}
+    local h = HRP()
+    if not h then return list end
+    local pos = h.Position
+    local folder = workspace:FindFirstChild("Enemies")
+    if not folder then return list end
+    for _, mob in ipairs(folder:GetChildren()) do
+        local hum = mob:FindFirstChildOfClass("Humanoid")
+        local root = mob:FindFirstChild("HumanoidRootPart")
+        if hum and root and hum.Health > 0 then
+            if (root.Position - pos).Magnitude <= maxRange then
+                local part = mob:FindFirstChild("LeftUpperArm")
+                    or mob:FindFirstChild("UpperTorso")
+                    or root
+                table.insert(list, { part = part })
+            end
+        end
+    end
+    return list
+end
+
+local function AttackAround()
+    if not _G.MultiHit then return end
+    if not RegisterAttack or not RegisterHit then return end
+    local targets = GetTargets(MULTI_RANGE)
+    if #targets == 0 then return end
+    pcall(function() RegisterAttack:FireServer(0.5) end)
+    for _, t in ipairs(targets) do
+        pcall(function() RegisterHit:FireServer(t.part, {}) end)
+    end
+end
+
+-------------------------------------------------
+-- HELPERS
+-------------------------------------------------
+local function CancelTween(t)
+    if t then pcall(function() t:Cancel() end) end
+end
+
+local function ZeroVel()
+    local h = HRP()
+    if not h then return end
+    pcall(function()
+        h.AssemblyLinearVelocity = Vector3.zero
+        h.AssemblyAngularVelocity = Vector3.zero
+        h.Velocity = Vector3.zero
+    end)
+end
+
+local function SetFarmMode(on)
+    farmingActive = on
+    local hum = Hum()
+    if not hum then return end
+    if on then
+        hum.AutoRotate = false
+        hum.WalkSpeed = 0
+        hum.JumpPower = 0
+    else
+        hum.AutoRotate = true
+        hum.WalkSpeed = 16
+        hum.JumpPower = 50
+        pcall(function()
+            local c = Char()
+            if c then
+                for _, p in ipairs(c:GetDescendants()) do
+                    if p:IsA("BasePart") then p.CanCollide = true end
+                end
+            end
+        end)
+        CancelTween(floatTween)
+        CancelTween(moveTween)
+        farmAnchor = nil
+        ZeroVel()
+    end
+end
+
+local function NoCollide()
+    if not farmingActive then return end
+    pcall(function()
+        local c = Char()
+        if not c then return end
+        for _, p in ipairs(c:GetDescendants()) do
+            if p:IsA("BasePart") then p.CanCollide = false end
+        end
+        local hum = Hum()
+        if hum then
+            hum.AutoRotate = false
+            hum.WalkSpeed = 0
+            hum.JumpPower = 0
+        end
+    end)
+end
+
+local function GetLevel()
+    local lv = 0
+    pcall(function()
+        local d = LP:FindFirstChild("Data") or LP:FindFirstChild("PlayerData")
+        if d then
+            local l = d:FindFirstChild("Level")
+            if l then lv = l.Value end
+        end
+    end)
+    return lv
+end
+
+local function EquipTool(name)
+    pcall(function()
+        if type(name) \~= "string" or #name == 0 then return end
+        local c, hum, bag = Char(), Hum(), LP:FindFirstChild("Backpack")
+        if not c or not hum then return end
+        local held = c:FindFirstChildOfClass("Tool")
+        if held and held.Name == name then return end
+        if held and bag then held.Parent = bag end
+        local tool = bag and bag:FindFirstChild(name)
+        if tool then hum:EquipTool(tool) end
+    end)
+end
+
+local function ScanWeapons()
+    WeaponList = {}
+    pcall(function()
+        local function add(folder)
+            if not folder then return end
+            for _, t in ipairs(folder:GetChildren()) do
+                if t:IsA("Tool") then table.insert(WeaponList, t.Name) end
+            end
+        end
+        add(LP:FindFirstChild("Backpack"))
+        add(Char())
+    end)
+    if #WeaponList == 0 then WeaponList = { "Combat" } end
+    if WeaponIndex > #WeaponList then WeaponIndex = 1 end
+    if type(SelectWeapon) == "string" and #SelectWeapon > 0 then
+        for i, n in ipairs(WeaponList) do
+            if n == SelectWeapon then
+                WeaponIndex = i
+                break
+            end
+        end
+    else
+        SelectWeapon = WeaponList[WeaponIndex]
+    end
+end
+
+local function NextWeapon()
+    ScanWeapons()
+    WeaponIndex = WeaponIndex + 1
+    if WeaponIndex > #WeaponList then WeaponIndex = 1 end
+    SelectWeapon = WeaponList[WeaponIndex]
+    EquipTool(SelectWeapon)
+    return SelectWeapon
+end
+
+local function KeepEquip()
+    if not _G.AutoEquip then return end
+    if type(SelectWeapon) == "string" and #SelectWeapon > 0 then
+        EquipTool(SelectWeapon)
+    end
+end
+
+local function DoHakiOnce()
+    if not _G.AutoHaki then
+        hakiDone = false
+        return
+    end
+    if hakiDone then return end
+    pcall(function()
+        RS.Remotes.CommF_:InvokeServer("Buso")
+        hakiDone = true
+    end)
+end
+
+local function TweenTo(cf, speed)
+    local h = HRP()
+    if not h then return end
+    speed = speed or TWEEN_SPEED
+    CancelTween(moveTween)
+    local dist = (h.Position - cf.Position).Magnitude
+    local t = math.clamp(dist / math.max(speed, 1), 0.35, 10)
+    moveTween = TweenService:Create(h, TweenInfo.new(t, Enum.EasingStyle.Linear), { CFrame = cf })
+    moveTween:Play()
+end
+
+local function FloatStill(pos)
+    local h = HRP()
+    if not h or not pos then return end
+    local goalPos = pos + Vector3.new(0, FLOAT_HEIGHT, 0)
+    local goal = CFrame.new(goalPos)
+    if (h.Position - goalPos).Magnitude < 2 then
+        h.CFrame = goal
+        ZeroVel()
+        NoCollide()
+        return
+    end
+    CancelTween(floatTween)
+    floatTween = TweenService:Create(h, TweenInfo.new(FLOAT_TWEEN_TIME, Enum.EasingStyle.Quad), { CFrame = goal })
+    floatTween:Play()
+    ZeroVel()
+    NoCollide()
+end
+
+local function FloatOn(mob)
+    if not mob then return end
+    local root = mob:FindFirstChild("HumanoidRootPart")
+    if not root then return end
+    if not farmAnchor then
+        farmAnchor = root.Position
+    end
+    FloatStill(farmAnchor)
+end
+
+-------------------------------------------------
+-- BRING MOB
+-------------------------------------------------
+local function BringSame(name, center)
+    if not _G.BringMob then return end
+    if not center then return end
+    local folder = workspace:FindFirstChild("Enemies")
+    if not folder then return end
+    local i = 0
+    for _, mob in ipairs(folder:GetChildren()) do
+        local hum = mob:FindFirstChildOfClass("Humanoid")
+        local root = mob:FindFirstChild("HumanoidRootPart")
+        if hum and root and hum.Health > 0 then
+            local match = true
+            if type(name) == "string" and #name > 0 then
+                match = string.find(string.lower(mob.Name), string.lower(name), 1, true) \~= nil
+            end
+            if match then
+                local d = (root.Position - center).Magnitude
+                if d <= BRING_RANGE then
+                    i = i + 1
+                    local offset = Vector3.new((i % 5) - 2, 0, math.floor(i / 5) % 5 - 2) * 1.2
+                    pcall(function()
+                        root.CFrame = CFrame.new(center + offset)
+                        root.AssemblyLinearVelocity = Vector3.zero
+                        root.CanCollide = false
+                    end)
+                end
+            end
+        end
+    end
+end
+
+-------------------------------------------------
+-- QUEST
+-------------------------------------------------
+local function CheckLevel()
+    local row = GetQuestByLevel(GetLevel())
+    if not row then
+        Ms, NameQuest, QuestLv, NameMon = "", "", 1, ""
+        CFrameQ, CFrameMon = CFrame.new(), CFrame.new()
+        return
+    end
+    Ms = row.Ms
+    NameQuest = row.NameQuest
+    QuestLv = row.QuestLv
+    NameMon = row.NameMon
+    CFrameQ = row.CFrameQ
+    CFrameMon = row.CFrameMon
+end
+
+local function HasQuest()
+    local ok = false
+    pcall(function()
+        local gui = LP.PlayerGui:FindFirstChild("Main")
+        local q = gui and gui:FindFirstChild("Quest")
+        if q and q.Visible then ok = true end
+    end)
+    return ok
+end
+
+local function TakeQuest()
+    pcall(function()
+        if type(NameQuest) \~= "string" or #NameQuest == 0 then return end
+        local h = HRP()
+        if h and CFrameQ then
+            if (h.Position - CFrameQ.Position).Magnitude > QUEST_ARRIVE then
+                TweenTo(CFrameQ * CFrame.new(0, 5, 0), TWEEN_SPEED)
+                return
+            end
+        end
+        RS.Remotes.CommF_:InvokeServer("StartQuest", NameQuest, QuestLv)
+    end)
+end
+
+local function EnsureQuest()
+    if not _G.AutoQuest then return true end
+    CheckLevel()
+    if type(NameQuest) == "string" and #NameQuest > 0 then
+        if not HasQuest() then
+            TakeQuest()
+            return false
+        end
+    end
+    return true
+end
+
+-------------------------------------------------
+-- FIND MOB
+-------------------------------------------------
+local function NameMatch(mobName, want)
+    if type(want) \~= "string" or #want == 0 then return true end
+    if type(mobName) \~= "string" then return false end
+    return string.find(string.lower(mobName), string.lower(want), 1, true) \~= nil
+end
+
+local function FindMob(name, range)
+    range = range or DETECT_RANGE
+    local h = HRP()
+    if not h then return nil end
+    local best, bestD = nil, range
+    local folder = workspace:FindFirstChild("Enemies")
+    if not folder then return nil end
+    for _, mob in ipairs(folder:GetChildren()) do
+        local hum = mob:FindFirstChildOfClass("Humanoid")
+        local root = mob:FindFirstChild("HumanoidRootPart")
+        if hum and root and hum.Health > 0 and NameMatch(mob.Name, name) then
+            local d = (root.Position - h.Position).Magnitude
+            if d < bestD then
+                bestD = d
+                best = mob
+            end
+        end
+    end
+    return best
+end
+
+local function FindNearMob()
+    return FindMob(nil, 8000)
+end
+
+local function FindLevelMob()
+    local h = HRP()
+    if not h then return nil end
+    if CFrameMon then
+        if (h.Position - CFrameMon.Position).Magnitude > FARM_ARRIVE then
+            farmAnchor = nil
+            TweenTo(CFrameMon * CFrame.new(0, FLOAT_HEIGHT, 0), TWEEN_SPEED)
+            return nil
+        end
+        if not farmAnchor then farmAnchor = CFrameMon.Position end
+    end
+    local mob = nil
+    if type(NameMon) == "string" and #NameMon > 0 then
+        mob = FindMob(NameMon, DETECT_RANGE)
+    end
+    if not mob then mob = FindNearMob() end
+    return mob
+end
+
+local function FindSelectedMon()
+    local h = HRP()
+    if not h then return nil end
+    local cf = GetMonCFrame(SelectMon)
+    if cf then
+        if (h.Position - cf.Position).Magnitude > FARM_ARRIVE then
+            farmAnchor = nil
+            TweenTo(cf * CFrame.new(0, FLOAT_HEIGHT, 0), TWEEN_SPEED)
+            return nil
+        end
+        if not farmAnchor then farmAnchor = cf.Position end
+    end
+    return FindMob(SelectMon, DETECT_RANGE) or FindNearMob()
+end
+
+local function FindRaidMob()
+    local islandCF = RaidIslands[raidIslandIndex]
+    if not islandCF then return nil end
+    local best, bestD = nil, RAID_ISLAND_RANGE
+    local folder = workspace:FindFirstChild("Enemies")
+    if not folder then return nil end
+    for _, mob in ipairs(folder:GetChildren()) do
+        local hum = mob:FindFirstChildOfClass("Humanoid")
+        local root = mob:FindFirstChild("HumanoidRootPart")
+        if hum and root and hum.Health > 0 then
+            local d = (root.Position - islandCF.Position).Magnitude
+            if d < bestD then
+                bestD = d
+                best = mob
+            end
+        end
+    end
+    return best
+end
+
+local function StayOnRaidIsland(cf)
+    local h = HRP()
+    if not h or not cf then return end
+    local goal = cf * CFrame.new(0, 8, 0)
+    if (h.Position - goal.Position).Magnitude > 10 then
+        TweenTo(goal, RAID_TWEEN_SPEED)
+    else
+        h.CFrame = goal
+        ZeroVel()
+    end
+end
+
+local function GoNextRaidIsland()
+    if raidIslandIndex < #RaidIslands then
+        raidIslandIndex = raidIslandIndex + 1
+    end
+    raidArrived = false
+    raidNoMobTimer = 0
+    farmAnchor = nil
+end
+
+local function AnyFarmOn()
+    return _G.AutoLevel or _G.AutoNear or _G.AutoRaid or _G.AutoFarmMon
+end
+
+local function NextMon()
+    if #MonList == 0 then return "None" end
+    MonIndex = MonIndex + 1
+    if MonIndex > #MonList then MonIndex = 1 end
+    SelectMon = MonList[MonIndex]
+    farmAnchor = nil
+    return SelectMon
+end
+
+-------------------------------------------------
+-- UI
+-------------------------------------------------
+pcall(function()
+    local old = PlayerGui:FindFirstChild("DekuHub")
+    if old then old:Destroy() end
+end)
+
+local LOGO_ID = "rbxassetid://88878549267971"
+local BLUE = Color3.fromRGB(55, 140, 255)
+local BG = Color3.fromRGB(14, 16, 22)
+local CARD = Color3.fromRGB(22, 26, 36)
+
+local ScreenGui = Instance.new("ScreenGui")
+ScreenGui.Name = "DekuHub"
+ScreenGui.ResetOnSpawn = false
+ScreenGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
+ScreenGui.Parent = PlayerGui
+
+local LogoButton = Instance.new("ImageButton")
+LogoButton.Size = UDim2.fromOffset(65, 65)
+LogoButton.Position = UDim2.new(0, 16, 0.5, -32)
+LogoButton.BackgroundColor3 = Color3.fromRGB(12, 14, 20)
+LogoButton.BorderSizePixel = 0
+LogoButton.Image = LOGO_ID
+LogoButton.ScaleType = Enum.ScaleType.Fit
+LogoButton.Parent = ScreenGui
+Instance.new("UICorner", LogoButton).CornerRadius = UDim.new(1, 0)
+local ls = Instance.new("UIStroke")
+ls.Color = BLUE
+ls.Thickness = 2
+ls.Parent = LogoButton
+
+local Main = Instance.new("Frame")
+Main.Size = UDim2.fromOffset(340, 420)
+Main.Position = UDim2.new(0.5, -170, 0.5, -210)
+Main.BackgroundColor3 = BG
+Main.BorderSizePixel = 0
+Main.Visible = true
+Main.Parent = ScreenGui
+Instance.new("UICorner", Main).CornerRadius = UDim.new(0, 12)
+
+local TopBar = Instance.new("Frame")
+TopBar.Size = UDim2.new(1, 0, 0, 44)
+TopBar.BackgroundColor3 = Color3.fromRGB(18, 22, 32)
+TopBar.BorderSizePixel = 0
+TopBar.Parent = Main
+Instance.new("UICorner", TopBar).CornerRadius = UDim.new(0, 12)
+
+local Title = Instance.new("TextLabel")
+Title.Size = UDim2.new(1, -48, 1, 0)
+Title.Position = UDim2.new(0, 14, 0, 0)
+Title.BackgroundTransparency = 1
+Title.Text = "Deku Hub"
+Title.TextColor3 = Color3.fromRGB(240, 245, 255)
+Title.TextSize = 17
+Title.Font = Enum.Font.GothamBold
+Title.TextXAlignment = Enum.TextXAlignment.Left
+Title.Parent = TopBar
+
+local Close = Instance.new("TextButton")
+Close.Size = UDim2.fromOffset(32, 32)
+Close.Position = UDim2.new(1, -38, 0.5, -16)
+Close.BackgroundColor3 = Color3.fromRGB(30, 34, 48)
+Close.Text = "x"
+Close.TextColor3 = Color3.fromRGB(220, 225, 235)
+Close.TextSize = 16
+Close.Font = Enum.Font.GothamBold
+Close.Parent = TopBar
+Instance.new("UICorner", Close).CornerRadius = UDim.new(0, 8)
+Close.MouseButton1Click:Connect(function()
+    Main.Visible = false
+end)
+
+local Scroll = Instance.new("ScrollingFrame")
+Scroll.Size = UDim2.new(1, -16, 1, -52)
+Scroll.Position = UDim2.new(0, 8, 0, 48)
+Scroll.BackgroundTransparency = 1
+Scroll.BorderSizePixel = 0
+Scroll.ScrollBarThickness = 3
+Scroll.ScrollBarImageColor3 = BLUE
+Scroll.CanvasSize = UDim2.new(0, 0, 0, 0)
+Scroll.AutomaticCanvasSize = Enum.AutomaticSize.Y
+Scroll.Parent = Main
+local lay = Instance.new("UIListLayout")
+lay.Padding = UDim.new(0, 6)
+lay.Parent = Scroll
+
+local function AddToggle(text, key, defaultOn)
+    local on = defaultOn and true or false
+    _G[key] = on
+    local btn = Instance.new("TextButton")
+    btn.Size = UDim2.new(1, -2, 0, 38)
+    btn.BackgroundColor3 = on and Color3.fromRGB(30, 75, 150) or CARD
+    btn.BorderSizePixel = 0
+    btn.Text = "  " .. text .. (on and "  · ON" or "  · OFF")
+    btn.TextColor3 = Color3.fromRGB(230, 235, 245)
+    btn.TextSize = 13
+    btn.Font = Enum.Font.GothamMedium
+    btn.TextXAlignment = Enum.TextXAlignment.Left
+    btn.Parent = Scroll
+    Instance.new("UICorner", btn).CornerRadius = UDim.new(0, 8)
+    btn.MouseButton1Click:Connect(function()
+        _G[key] = not _G[key]
+        local v = _G[key]
+        btn.Text = "  " .. text .. (v and "  · ON" or "  · OFF")
+        btn.BackgroundColor3 = v and Color3.fromRGB(30, 75, 150) or CARD
+        if key == "AutoRaid" and v then
+            raidIslandIndex = 1
+            raidArrived = false
+            raidNoMobTimer = 0
+        end
+        if key == "AutoHaki" and v then
+            hakiDone = false
+        end
+        if not AnyFarmOn() then
+            SetFarmMode(false)
+        end
+        farmAnchor = nil
+    end)
+end
+
+local function AddBtn(text, cb)
+    local btn = Instance.new("TextButton")
+    btn.Size = UDim2.new(1, -2, 0, 38)
+    btn.BackgroundColor3 = CARD
+    btn.BorderSizePixel = 0
+    btn.Text = "  " .. text
+    btn.TextColor3 = Color3.fromRGB(230, 235, 245)
+    btn.TextSize = 13
+    btn.Font = Enum.Font.GothamMedium
+    btn.TextXAlignment = Enum.TextXAlignment.Left
+    btn.Parent = Scroll
+    Instance.new("UICorner", btn).CornerRadius = UDim.new(0, 8)
+    btn.MouseButton1Click:Connect(function()
+        if cb then cb(btn) end
+    end)
+    return btn
+end
+
+AddToggle("Auto Level + Quest", "AutoLevel", false)
+AddToggle("Auto Farm Mon", "AutoFarmMon", false)
+AddToggle("Auto Near", "AutoNear", false)
+AddToggle("Auto Quest", "AutoQuest", true)
+AddToggle("Auto Raid 1-5", "AutoRaid", false)
+AddToggle("Bring Mob", "BringMob", true)
+AddToggle("Auto Haki (once)", "AutoHaki", true)
+AddToggle("Auto Equip", "AutoEquip", true)
+AddToggle("Multi Hit 150", "MultiHit", true)
+
+local monBtn = AddBtn("Mon: " .. ((SelectMon \~= "" and SelectMon) or "None"), function(b)
+    b.Text = "  Mon: " .. NextMon()
+end)
+local wepBtn = AddBtn("Weapon: " .. SelectWeapon, function(b)
+    b.Text = "  Weapon: " .. NextWeapon()
+end)
+AddBtn("Reset Raid → 1", function()
+    raidIslandIndex = 1
+    raidArrived = false
+    raidNoMobTimer = 0
+    farmAnchor = nil
+end)
+
+LogoButton.MouseButton1Click:Connect(function()
+    Main.Visible = not Main.Visible
+end)
+
+local Dragging, DragStart, StartPos = false, nil, nil
+TopBar.InputBegan:Connect(function(Input)
+    if Input.UserInputType == Enum.UserInputType.MouseButton1 or Input.UserInputType == Enum.UserInputType.Touch then
+        Dragging = true
+        DragStart = Input.Position
+        StartPos = Main.Position
+        Input.Changed:Connect(function()
+            if Input.UserInputState == Enum.UserInputState.End then
+                Dragging = false
+            end
+        end)
+    end
+end)
+UserInputService.InputChanged:Connect(function(Input)
+    if Dragging and (Input.UserInputType == Enum.UserInputType.MouseMovement or Input.UserInputType == Enum.UserInputType.Touch) then
+        local d = Input.Position - DragStart
+        Main.Position = UDim2.new(StartPos.X.Scale, StartPos.X.Offset + d.X, StartPos.Y.Scale, StartPos.Y.Offset + d.Y)
+    end
+end)
+
+-------------------------------------------------
+-- LOOPS
+-------------------------------------------------
+local function FarmAt(mob, monName)
+    if not farmAnchor then
+        local root = mob and mob:FindFirstChild("HumanoidRootPart")
+        farmAnchor = root and root.Position or (HRP() and HRP().Position)
+    end
+    if farmAnchor then
+        BringSame(monName, farmAnchor)
+        FloatStill(farmAnchor)
+        AttackAround()
+    end
+end
+
+task.spawn(function()
+    while true do
+        if _G.AutoLevel then
+            SetFarmMode(true)
+            pcall(function()
+                DoHakiOnce()
+                KeepEquip()
+                CheckLevel()
+                if EnsureQuest() or not _G.AutoQuest then
+                    local mob = FindLevelMob()
+                    if mob then FarmAt(mob, NameMon) end
+                end
+            end)
+            task.wait(FAST_DELAY)
+        else
+            if not AnyFarmOn() then SetFarmMode(false) end
+            task.wait(0.1)
+        end
+    end
+end)
+
+task.spawn(function()
+    while true do
+        if _G.AutoFarmMon then
+            SetFarmMode(true)
+            pcall(function()
+                DoHakiOnce()
+                KeepEquip()
+                local mob = FindSelectedMon()
+                if mob then FarmAt(mob, SelectMon) end
+            end)
+            task.wait(FAST_DELAY)
+        else
+            task.wait(0.1)
+        end
+    end
+end)
+
+task.spawn(function()
+    while true do
+        if _G.AutoNear then
+            SetFarmMode(true)
+            pcall(function()
+                DoHakiOnce()
+                KeepEquip()
+                local mob = FindNearMob()
+                if mob then FarmAt(mob, nil) end
+            end)
+            task.wait(FAST_DELAY)
+        else
+            task.wait(0.1)
+        end
+    end
+end)
+
+task.spawn(function()
+    while true do
+        if _G.AutoRaid then
+            SetFarmMode(true)
+            pcall(function()
+                DoHakiOnce()
+                KeepEquip()
+                local islandCF = RaidIslands[raidIslandIndex]
+                if not islandCF then return end
+                local h = HRP()
+                if not h then return end
+                if not raidArrived then
+                    if (h.Position - islandCF.Position).Magnitude > ARRIVE_DIST then
+                        TweenTo(islandCF * CFrame.new(0, 8, 0), RAID_TWEEN_SPEED)
+                        return
+                    end
+                    raidArrived = true
+                    raidNoMobTimer = 0
+                    farmAnchor = islandCF.Position
+                end
+                local mob = FindRaidMob()
+                if mob then
+                    raidNoMobTimer = 0
+                    FarmAt(mob, nil)
+                else
+                    StayOnRaidIsland(islandCF)
+                    raidNoMobTimer = raidNoMobTimer + math.max(FAST_DELAY, 0.05)
+                    if raidNoMobTimer >= RAID_NO_MOB_WAIT then
+                        if raidIslandIndex < #RaidIslands then
+                            GoNextRaidIsland()
+                        else
+                            raidNoMobTimer = 0
+                        end
+                    end
+                end
+            end)
+            task.wait(FAST_DELAY)
+        else
+            task.wait(0.1)
+        end
+    end
+end)
+
+RunService.RenderStepped:Connect(function()
+    if farmingActive then
+        NoCollide()
+        ZeroVel()
+    end
+end)
+
+task.spawn(function()
+    local function hook(c)
+        if not c then return end
+        local st = c:FindFirstChild("Stun")
+        if st then
+            st.Changed:Connect(function()
+                pcall(function()
+                    if c:FindFirstChild("Stun") then
+                        c.Stun.Value = 0
+                    end
+                end)
+            end)
+        end
+    end
+    if LP.Character then hook(LP.Character) end
+    LP.CharacterAdded:Connect(function(c)
+        task.wait(0.5)
+        hook(c)
+        CancelTween(floatTween)
+        CancelTween(moveTween)
+        raidArrived = false
+        hakiDone = false
+        farmAnchor = nil
+        if farmingActive then SetFarmMode(true) end
+    end)
+end)
+
+task.spawn(function()
+    while true do
+        task.wait(60)
+        pcall(function()
+            VU:CaptureController()
+            VU:ClickButton2(Vector2.new())
+        end)
+    end
+end)
+
+ScanWeapons()
+KeepEquip()
+print("[Deku Hub] Ready · no error · MultiHit · Bring · H18 · Raid 1-5")

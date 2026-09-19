@@ -1,0 +1,637 @@
+--[[
+    DEKU HUB - Custom Game Version
+    สำหรับเกมที่คุณพัฒนาเองเท่านั้น
+    UI เล็ก · มือถือ · Item Lock · Multi Hit
+]]
+
+repeat task.wait() until game:IsLoaded()
+
+local Players           = game:GetService("Players")
+local RS                = game:GetService("ReplicatedStorage")
+local RunService        = game:GetService("RunService")
+local TweenService      = game:GetService("TweenService")
+local UserInputService  = game:GetService("UserInputService")
+local StarterGui        = game:GetService("StarterGui")
+
+local LP = Players.LocalPlayer
+repeat task.wait() until LP
+local PlayerGui = LP:WaitForChild("PlayerGui")
+
+-------------------------------------------------
+-- CONFIG (แก้ค่าตรงนี้ได้ทั้งหมด)
+-------------------------------------------------
+local Config = {
+    HubName         = "DEKU HUB",
+    AccentColor     = Color3.fromRGB(55, 140, 255),
+    UISize          = UDim2.fromOffset(330, 400),
+    LogoSize        = UDim2.fromOffset(52, 52),
+
+    -- Features
+    AutoFarm        = false,
+    AutoQuest       = false,
+    AutoCollect     = false,
+    AutoDungeon     = false,
+    FastAttack      = false,
+    AutoAttack      = false,
+    ItemLock        = true,
+    Notifications   = true,
+    UIAnimation     = true,
+
+    -- Combat
+    AttackSpeed     = 0.03,     -- ยิ่งน้อยยิ่งรัว
+    AttackRange     = 150,
+
+    -- Target
+    TargetMode      = "Nearest", -- "Nearest" | "LowestHealth" | "Quest"
+
+    -- Selected Item
+    SelectedItem    = "",
+    CurrentEquipped = "",
+}
+
+-------------------------------------------------
+-- SERVICES & SHORTCUTS
+-------------------------------------------------
+local function Char() return LP.Character end
+local function Hum()
+    local c = Char()
+    return c and c:FindFirstChildOfClass("Humanoid")
+end
+local function HRP()
+    local c = Char()
+    return c and c:FindFirstChild("HumanoidRootPart")
+end
+
+-------------------------------------------------
+-- MULTI HIT (ตามโค้ดที่คุณให้มา)
+-------------------------------------------------
+local RegisterAttack, RegisterHit
+pcall(function()
+    local Net = RS:WaitForChild("Modules", 5):WaitForChild("Net", 5)
+    RegisterAttack = Net:WaitForChild("RE/RegisterAttack", 5)
+    RegisterHit    = Net:WaitForChild("RE/RegisterHit", 5)
+end)
+
+local function GetTargets(maxRange)
+    local list = {}
+    local h = HRP()
+    if not h then return list end
+    local pos = h.Position
+    local folder = workspace:FindFirstChild("Enemies")
+    if not folder then return list end
+
+    for _, mob in ipairs(folder:GetChildren()) do
+        local hum  = mob:FindFirstChildOfClass("Humanoid")
+        local root = mob:FindFirstChild("HumanoidRootPart")
+        if hum and root and hum.Health > 0 then
+            if (root.Position - pos).Magnitude <= maxRange then
+                local part = mob:FindFirstChild("LeftUpperArm")
+                    or mob:FindFirstChild("UpperTorso")
+                    or root
+                table.insert(list, { mob = mob, part = part })
+            end
+        end
+    end
+    return list
+end
+
+local function DoMultiHit()
+    if not Config.FastAttack and not Config.AutoAttack then return end
+    if not RegisterAttack or not RegisterHit then return end
+
+    local targets = GetTargets(Config.AttackRange)
+    if #targets == 0 then return end
+
+    pcall(function()
+        RegisterAttack:FireServer(0.5)
+    end)
+    for _, t in ipairs(targets) do
+        pcall(function()
+            RegisterHit:FireServer(t.part, {})
+        end)
+    end
+end
+
+-------------------------------------------------
+-- ITEM / EQUIP MANAGER
+-------------------------------------------------
+local function GetSelectedItem()
+    return Config.SelectedItem
+end
+
+local function IsSelectedItemAvailable()
+    local name = Config.SelectedItem
+    if name == "" then return false end
+
+    local bag = LP:FindFirstChild("Backpack")
+    local char = Char()
+    if bag and bag:FindFirstChild(name) then return true end
+    if char and char:FindFirstChild(name) then return true end
+    return false
+end
+
+local function EquipSelectedItem()
+    if not Config.ItemLock then return end
+    local name = Config.SelectedItem
+    if name == "" then return end
+
+    -- ถ้าถืออยู่แล้วไม่ต้องทำอะไร
+    local char = Char()
+    if char then
+        local held = char:FindFirstChildOfClass("Tool")
+        if held and held.Name == name then
+            Config.CurrentEquipped = name
+            return
+        end
+    end
+
+    if not IsSelectedItemAvailable() then
+        Notify("Selected Item Not Found")
+        return
+    end
+
+    pcall(function()
+        local hum = Hum()
+        local bag = LP:FindFirstChild("Backpack")
+        if not hum or not bag then return end
+
+        local held = char and char:FindFirstChildOfClass("Tool")
+        if held then held.Parent = bag end
+
+        local tool = bag:FindFirstChild(name)
+        if tool then
+            hum:EquipTool(tool)
+            Config.CurrentEquipped = name
+        end
+    end)
+end
+
+local function ScanInventory()
+    local list = {}
+    local function add(folder)
+        if not folder then return end
+        for _, item in ipairs(folder:GetChildren()) do
+            if item:IsA("Tool") then
+                table.insert(list, item.Name)
+            end
+        end
+    end
+    add(LP:FindFirstChild("Backpack"))
+    add(Char())
+    return list
+end
+
+-------------------------------------------------
+-- NOTIFICATION
+-------------------------------------------------
+local function Notify(text)
+    if not Config.Notifications then return end
+    pcall(function()
+        StarterGui:SetCore("SendNotification", {
+            Title = Config.HubName,
+            Text = text,
+            Duration = 2.5
+        })
+    end)
+end
+
+-------------------------------------------------
+-- TARGET SYSTEM
+-------------------------------------------------
+local function FindTarget()
+    local h = HRP()
+    if not h then return nil end
+
+    local folder = workspace:FindFirstChild("Enemies")
+    if not folder then return nil end
+
+    local best, bestValue = nil, math.huge
+
+    for _, mob in ipairs(folder:GetChildren()) do
+        local hum  = mob:FindFirstChildOfClass("Humanoid")
+        local root = mob:FindFirstChild("HumanoidRootPart")
+        if hum and root and hum.Health > 0 then
+            local dist = (root.Position - h.Position).Magnitude
+            if dist > Config.AttackRange then continue end
+
+            if Config.TargetMode == "Nearest" then
+                if dist < bestValue then
+                    bestValue = dist
+                    best = mob
+                end
+            elseif Config.TargetMode == "LowestHealth" then
+                if hum.Health < bestValue then
+                    bestValue = hum.Health
+                    best = mob
+                end
+            else -- Quest
+                if dist < bestValue then
+                    bestValue = dist
+                    best = mob
+                end
+            end
+        end
+    end
+    return best
+end
+
+-------------------------------------------------
+-- AUTO FARM / QUEST / DUNGEON (โครงสร้างพร้อมใช้)
+-------------------------------------------------
+local farmConnection = nil
+
+local function StopAllLoops()
+    if farmConnection then
+        farmConnection:Disconnect()
+        farmConnection = nil
+    end
+end
+
+local function StartAutoFarm()
+    StopAllLoops()
+    farmConnection = RunService.Heartbeat:Connect(function()
+        if not Config.AutoFarm then return end
+        pcall(function()
+            EquipSelectedItem()
+            DoMultiHit()
+        end)
+    end)
+end
+
+-------------------------------------------------
+-- UI CREATION
+-------------------------------------------------
+local ScreenGui = Instance.new("ScreenGui")
+ScreenGui.Name = "DekuHub"
+ScreenGui.ResetOnSpawn = false
+ScreenGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
+ScreenGui.Parent = PlayerGui
+
+-- ========== LOGO TOGGLE ==========
+local LogoBtn = Instance.new("ImageButton")
+LogoBtn.Name = "LogoToggle"
+LogoBtn.Size = Config.LogoSize
+LogoBtn.Position = UDim2.new(0, 20, 0.5, -26)
+LogoBtn.BackgroundColor3 = Color3.fromRGB(20, 22, 30)
+LogoBtn.BorderSizePixel = 0
+LogoBtn.Image = "" -- ใส่ rbxassetid:// ของโลโก้คุณได้
+LogoBtn.Parent = ScreenGui
+Instance.new("UICorner", LogoBtn).CornerRadius = UDim.new(1, 0)
+local logoStroke = Instance.new("UIStroke")
+logoStroke.Color = Config.AccentColor
+logoStroke.Thickness = 2
+logoStroke.Parent = LogoBtn
+
+-- ========== MAIN UI ==========
+local Main = Instance.new("Frame")
+Main.Name = "Main"
+Main.Size = Config.UISize
+Main.Position = UDim2.new(0.5, -165, 0.5, -200)
+Main.BackgroundColor3 = Color3.fromRGB(16, 18, 24)
+Main.BorderSizePixel = 0
+Main.Visible = true
+Main.Parent = ScreenGui
+Instance.new("UICorner", Main).CornerRadius = UDim.new(0, 12)
+local mainStroke = Instance.new("UIStroke")
+mainStroke.Color = Color3.fromRGB(40, 45, 60)
+mainStroke.Thickness = 1
+mainStroke.Parent = Main
+
+-- Header
+local Header = Instance.new("Frame")
+Header.Size = UDim2.new(1, 0, 0, 44)
+Header.BackgroundColor3 = Color3.fromRGB(22, 25, 35)
+Header.BorderSizePixel = 0
+Header.Parent = Main
+Instance.new("UICorner", Header).CornerRadius = UDim.new(0, 12)
+
+local Title = Instance.new("TextLabel")
+Title.Size = UDim2.new(1, -80, 1, 0)
+Title.Position = UDim2.new(0, 14, 0, 0)
+Title.BackgroundTransparency = 1
+Title.Text = Config.HubName
+Title.TextColor3 = Color3.fromRGB(240, 245, 255)
+Title.TextSize = 16
+Title.Font = Enum.Font.GothamBold
+Title.TextXAlignment = Enum.TextXAlignment.Left
+Title.Parent = Header
+
+local Status = Instance.new("TextLabel")
+Status.Size = UDim2.new(0, 60, 0, 20)
+Status.Position = UDim2.new(1, -110, 0.5, -10)
+Status.BackgroundTransparency = 1
+Status.Text = "Online"
+Status.TextColor3 = Color3.fromRGB(80, 220, 120)
+Status.TextSize = 12
+Status.Font = Enum.Font.Gotham
+Status.Parent = Header
+
+local CloseBtn = Instance.new("TextButton")
+CloseBtn.Size = UDim2.fromOffset(28, 28)
+CloseBtn.Position = UDim2.new(1, -36, 0.5, -14)
+CloseBtn.BackgroundColor3 = Color3.fromRGB(40, 45, 60)
+CloseBtn.Text = "×"
+CloseBtn.TextColor3 = Color3.fromRGB(220, 220, 230)
+CloseBtn.TextSize = 18
+CloseBtn.Font = Enum.Font.GothamBold
+CloseBtn.Parent = Header
+Instance.new("UICorner", CloseBtn).CornerRadius = UDim.new(0, 6)
+
+-- Tab Buttons
+local TabBar = Instance.new("Frame")
+TabBar.Size = UDim2.new(1, -16, 0, 32)
+TabBar.Position = UDim2.new(0, 8, 0, 50)
+TabBar.BackgroundTransparency = 1
+TabBar.Parent = Main
+
+local Tabs = {"Farm", "Combat", "Inventory", "Settings"}
+local TabButtons = {}
+local CurrentTab = "Farm"
+
+local Content = Instance.new("ScrollingFrame")
+Content.Size = UDim2.new(1, -16, 1, -94)
+Content.Position = UDim2.new(0, 8, 0, 88)
+Content.BackgroundTransparency = 1
+Content.BorderSizePixel = 0
+Content.ScrollBarThickness = 3
+Content.ScrollBarImageColor3 = Config.AccentColor
+Content.CanvasSize = UDim2.new(0, 0, 0, 0)
+Content.AutomaticCanvasSize = Enum.AutomaticSize.Y
+Content.Parent = Main
+
+local Layout = Instance.new("UIListLayout")
+Layout.Padding = UDim.new(0, 6)
+Layout.Parent = Content
+
+-------------------------------------------------
+-- UI HELPERS
+-------------------------------------------------
+local function ClearContent()
+    for _, child in ipairs(Content:GetChildren()) do
+        if not child:IsA("UIListLayout") then
+            child:Destroy()
+        end
+    end
+end
+
+local function CreateToggle(text, key, callback)
+    local btn = Instance.new("TextButton")
+    btn.Size = UDim2.new(1, 0, 0, 38)
+    btn.BackgroundColor3 = Config[key] and Color3.fromRGB(35, 80, 160) or Color3.fromRGB(28, 32, 42)
+    btn.BorderSizePixel = 0
+    btn.Text = "  " .. text .. (Config[key] and "  · ON" or "  · OFF")
+    btn.TextColor3 = Color3.fromRGB(235, 240, 250)
+    btn.TextSize = 13
+    btn.Font = Enum.Font.GothamMedium
+    btn.TextXAlignment = Enum.TextXAlignment.Left
+    btn.Parent = Content
+    Instance.new("UICorner", btn).CornerRadius = UDim.new(0, 8)
+
+    btn.MouseButton1Click:Connect(function()
+        Config[key] = not Config[key]
+        local on = Config[key]
+        btn.Text = "  " .. text .. (on and "  · ON" or "  · OFF")
+        btn.BackgroundColor3 = on and Color3.fromRGB(35, 80, 160) or Color3.fromRGB(28, 32, 42)
+        Notify(text .. (on and ": ON" or ": OFF"))
+        if callback then callback(on) end
+    end)
+    return btn
+end
+
+local function CreateButton(text, callback)
+    local btn = Instance.new("TextButton")
+    btn.Size = UDim2.new(1, 0, 0, 36)
+    btn.BackgroundColor3 = Color3.fromRGB(28, 32, 42)
+    btn.BorderSizePixel = 0
+    btn.Text = "  " .. text
+    btn.TextColor3 = Color3.fromRGB(235, 240, 250)
+    btn.TextSize = 13
+    btn.Font = Enum.Font.GothamMedium
+    btn.TextXAlignment = Enum.TextXAlignment.Left
+    btn.Parent = Content
+    Instance.new("UICorner", btn).CornerRadius = UDim.new(0, 8)
+    btn.MouseButton1Click:Connect(function()
+        if callback then callback() end
+    end)
+    return btn
+end
+
+local function CreateLabel(text)
+    local lbl = Instance.new("TextLabel")
+    lbl.Size = UDim2.new(1, 0, 0, 24)
+    lbl.BackgroundTransparency = 1
+    lbl.Text = text
+    lbl.TextColor3 = Color3.fromRGB(180, 190, 210)
+    lbl.TextSize = 12
+    lbl.Font = Enum.Font.Gotham
+    lbl.TextXAlignment = Enum.TextXAlignment.Left
+    lbl.Parent = Content
+    return lbl
+end
+
+-------------------------------------------------
+-- BUILD TABS
+-------------------------------------------------
+local function BuildFarmTab()
+    ClearContent()
+    CreateToggle("Auto Farm Level", "AutoFarm", function(on)
+        if on then StartAutoFarm() else StopAllLoops() end
+    end)
+    CreateToggle("Auto Quest", "AutoQuest")
+    CreateToggle("Auto Collect", "AutoCollect")
+    CreateToggle("Auto Dungeon", "AutoDungeon")
+end
+
+local function BuildCombatTab()
+    ClearContent()
+    CreateToggle("Fast Attack", "FastAttack")
+    CreateToggle("Auto Attack", "AutoAttack")
+    CreateLabel("Attack Range: " .. Config.AttackRange)
+    CreateLabel("Attack Speed: " .. Config.AttackSpeed)
+    CreateButton("Target: Nearest", function()
+        Config.TargetMode = "Nearest"
+        Notify("Target Mode: Nearest")
+    end)
+    CreateButton("Target: Lowest Health", function()
+        Config.TargetMode = "LowestHealth"
+        Notify("Target Mode: Lowest Health")
+    end)
+end
+
+local function BuildInventoryTab()
+    ClearContent()
+    CreateLabel("Selected: " .. (Config.SelectedItem \~= "" and Config.SelectedItem or "None"))
+    CreateLabel("Equipped: " .. (Config.CurrentEquipped \~= "" and Config.CurrentEquipped or "None"))
+    CreateToggle("Item Lock", "ItemLock")
+
+    CreateButton("Refresh Inventory", function()
+        local items = ScanInventory()
+        Notify("Found " .. #items .. " items")
+        BuildInventoryTab() -- refresh UI
+    end)
+
+    local items = ScanInventory()
+    for _, name in ipairs(items) do
+        local isSelected = (name == Config.SelectedItem)
+        local btn = Instance.new("TextButton")
+        btn.Size = UDim2.new(1, 0, 0, 34)
+        btn.BackgroundColor3 = isSelected and Color3.fromRGB(40, 90, 50) or Color3.fromRGB(28, 32, 42)
+        btn.BorderSizePixel = 0
+        btn.Text = (isSelected and "  ✓  " or "  ○  ") .. name
+        btn.TextColor3 = Color3.fromRGB(235, 240, 250)
+        btn.TextSize = 13
+        btn.Font = Enum.Font.Gotham
+        btn.TextXAlignment = Enum.TextXAlignment.Left
+        btn.Parent = Content
+        Instance.new("UICorner", btn).CornerRadius = UDim.new(0, 6)
+
+        btn.MouseButton1Click:Connect(function()
+            Config.SelectedItem = name
+            Notify("Selected: " .. name)
+            EquipSelectedItem()
+            BuildInventoryTab()
+        end)
+    end
+end
+
+local function BuildSettingsTab()
+    ClearContent()
+    CreateToggle("Notifications", "Notifications")
+    CreateToggle("UI Animation", "UIAnimation")
+    CreateButton("Reset UI Position", function()
+        Main.Position = UDim2.new(0.5, -165, 0.5, -200)
+        LogoBtn.Position = UDim2.new(0, 20, 0.5, -26)
+        Notify("UI Position Reset")
+    end)
+    CreateButton("Show / Hide Logo", function()
+        LogoBtn.Visible = not LogoBtn.Visible
+    end)
+end
+
+local function SwitchTab(name)
+    CurrentTab = name
+    for n, b in pairs(TabButtons) do
+        b.BackgroundColor3 = (n == name) and Config.AccentColor or Color3.fromRGB(30, 34, 45)
+    end
+    if name == "Farm" then BuildFarmTab()
+    elseif name == "Combat" then BuildCombatTab()
+    elseif name == "Inventory" then BuildInventoryTab()
+    elseif name == "Settings" then BuildSettingsTab()
+    end
+end
+
+-- Create Tab Buttons
+for i, name in ipairs(Tabs) do
+    local btn = Instance.new("TextButton")
+    btn.Size = UDim2.new(0.25, -4, 1, 0)
+    btn.Position = UDim2.new((i-1)*0.25, 2, 0, 0)
+    btn.BackgroundColor3 = Color3.fromRGB(30, 34, 45)
+    btn.Text = name
+    btn.TextColor3 = Color3.new(1, 1, 1)
+    btn.TextSize = 12
+    btn.Font = Enum.Font.GothamMedium
+    btn.Parent = TabBar
+    Instance.new("UICorner", btn).CornerRadius = UDim.new(0, 6)
+    TabButtons[name] = btn
+    btn.MouseButton1Click:Connect(function()
+        SwitchTab(name)
+    end)
+end
+
+SwitchTab("Farm")
+
+-------------------------------------------------
+-- OPEN / CLOSE + ANIMATION
+-------------------------------------------------
+local function SetUIVisible(visible)
+    if Config.UIAnimation then
+        local goal = visible and {BackgroundTransparency = 0} or {BackgroundTransparency = 1}
+        -- simple fade
+        Main.Visible = true
+        TweenService:Create(Main, TweenInfo.new(0.2), {
+            Size = visible and Config.UISize or UDim2.fromOffset(Config.UISize.X.Offset * 0.9, Config.UISize.Y.Offset * 0.9)
+        }):Play()
+        task.delay(0.05, function()
+            Main.Visible = visible
+            if visible then
+                Main.Size = Config.UISize
+            end
+        end)
+    else
+        Main.Visible = visible
+    end
+end
+
+LogoBtn.MouseButton1Click:Connect(function()
+    SetUIVisible(not Main.Visible)
+end)
+CloseBtn.MouseButton1Click:Connect(function()
+    SetUIVisible(false)
+end)
+
+-------------------------------------------------
+-- DRAG SYSTEM (Main + Logo) - รองรับมือถือ
+-------------------------------------------------
+local function MakeDraggable(frame, dragHandle)
+    local dragging, dragStart, startPos
+    local handle = dragHandle or frame
+
+    handle.InputBegan:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseButton1
+        or input.UserInputType == Enum.UserInputType.Touch then
+            dragging = true
+            dragStart = input.Position
+            startPos = frame.Position
+            input.Changed:Connect(function()
+                if input.UserInputState == Enum.UserInputState.End then
+                    dragging = false
+                end
+            end)
+        end
+    end)
+
+    UserInputService.InputChanged:Connect(function(input)
+        if dragging and (input.UserInputType == Enum.UserInputType.MouseMovement
+        or input.UserInputType == Enum.UserInputType.Touch) then
+            local delta = input.Position - dragStart
+            frame.Position = UDim2.new(
+                startPos.X.Scale,
+                startPos.X.Offset + delta.X,
+                startPos.Y.Scale,
+                startPos.Y.Offset + delta.Y
+            )
+        end
+    end)
+end
+
+MakeDraggable(Main, Header)
+MakeDraggable(LogoBtn)
+
+-------------------------------------------------
+-- MAIN COMBAT LOOP
+-------------------------------------------------
+task.spawn(function()
+    while true do
+        if Config.FastAttack or Config.AutoAttack or Config.AutoFarm then
+            pcall(function()
+                EquipSelectedItem()
+                DoMultiHit()
+            end)
+            task.wait(Config.AttackSpeed)
+        else
+            task.wait(0.15)
+        end
+    end
+end)
+
+-------------------------------------------------
+-- RESPAWN HANDLER
+-------------------------------------------------
+LP.CharacterAdded:Connect(function()
+    task.wait(0.8)
+    if Config.ItemLock and Config.SelectedItem \~= "" then
+        EquipSelectedItem()
+    end
+end)
+
+print("[" .. Config.HubName .. "] Loaded successfully")
